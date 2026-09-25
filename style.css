@@ -138,6 +138,8 @@ input[type="text"] {
 }
 .choice-btn.correct { background: #d8f0e3; border-color: var(--success); font-weight: 600; }
 .choice-btn.incorrect { background: #fbe0dc; border-color: var(--danger); font-weight: 600; }
+/* クリックした直後、正誤の判定が返ってくるまでの「選択中」の色(採点結果が出たらcorrect/incorrectに上書きされる) */
+.choice-btn.pending { background: #eef2ee; border-color: var(--muted); }
 /* 選んだ選択肢だと分かるよう、太い枠線とマークを付けて他と区別する */
 .choice-btn.selected { border-width: 3px; padding: 12px; position: relative; }
 .choice-btn.selected.correct::after { content: "✓ あなたの回答"; display: block; font-size: 11px; font-weight: 700; color: var(--success); margin-top: 4px; }

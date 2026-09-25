@@ -2,7 +2,7 @@
 // 設計書V2 3章・6章 に対応
 
 // ★ GASをウェブアプリとしてデプロイした後、発行されたURLをここに設定してください。
-const GAS_API_URL = 'ここにデプロイ後のGAS Web AプリURLを貼り付け';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxnQQdJqVCD23KNfoA6Pr5HYB1YFJoW0Im39TK7k9-AjLXZu3y-0vtth9eZNrOh8vAySw/exec';
 
 const LS_TOKEN_KEY = 'eiken_family_token';
 

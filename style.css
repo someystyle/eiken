@@ -126,6 +126,22 @@ input[type="text"] {
 .quiz-word { font-size: 32px; font-weight: 700; color: var(--primary-dark); margin: 12px 0 4px; }
 .quiz-instruction { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
 
+/* 新規暗記カード(初めて見る単語をまず覚える画面) */
+.memorize-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: #e3f0e9;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+}
+.memorize-phonetic { color: var(--muted); font-size: 15px; margin: 0 0 16px; }
+.memorize-meaning { font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+.memorize-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+#memorizeNextBtn { margin-top: 12px; }
+
 .choice-list { display: flex; flex-direction: column; gap: 10px; }
 .choice-btn {
   padding: 14px;

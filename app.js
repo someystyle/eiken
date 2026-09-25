@@ -149,11 +149,10 @@ function statItem(value, label) {
 // ---- セッション開始 (6-1節) ----
 function startSession() {
   showScreen('screen-quiz');
-  document.getElementById('quizWord').textContent = '出題中...';
-  document.getElementById('quizChoices').innerHTML = '';
+  document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題中...</p>';
   callApi('getQuiz', { token: state.token, minutes: state.minutes, condition: state.condition }).then(function (res) {
     if (!res.ok || !res.questions || res.questions.length === 0) {
-      document.getElementById('quizWord').textContent = '出題できる問題がありません';
+      document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題できる問題がありません</p>';
       return;
     }
     state.questions = res.questions;
@@ -166,12 +165,57 @@ function startSession() {
 function renderQuestion() {
   const q = state.questions[state.currentIndex];
   document.getElementById('quizProgress').textContent = (state.currentIndex + 1) + ' / ' + state.questions.length;
-  document.getElementById('quizWord').textContent = q.english;
-  document.getElementById('quizFeedback').textContent = '';
-  document.getElementById('quizFeedback').className = 'feedback-text';
+  if (q.type === 'memorize') {
+    renderMemorizeCard(q);
+  } else {
+    renderQuizCard(q);
+  }
+  state.questionStartTime = Date.now();
+}
+
+// ---- 新規暗記カード (6-2節「Vocabulary新規暗記」: 初めて見る単語をまず覚える) ----
+function renderMemorizeCard(q) {
+  const card = document.getElementById('quizCard');
+  const phoneticLine = q.phonetic ? (q.phonetic + (q.katakana ? '　' + q.katakana : '')) : (q.katakana || '');
+  const uncertainNote = q.phoneticUncertain
+    ? '<p class="memorize-note">※品詞によって発音が変わる語です。正確な発音はTTS音声などで確認してください。</p>'
+    : '';
+  card.innerHTML =
+    '<p class="memorize-label">はじめて見る単語</p>' +
+    '<p class="quiz-word">' + escapeHtml_(q.english) + '</p>' +
+    (phoneticLine ? '<p class="memorize-phonetic">' + escapeHtml_(phoneticLine) + '</p>' : '') +
+    '<p class="memorize-meaning">' + escapeHtml_(q.japanese) + '</p>' +
+    uncertainNote +
+    '<button id="memorizeNextBtn" class="btn-primary">覚えた → 次へ</button>';
+
+  document.getElementById('memorizeNextBtn').addEventListener('click', function () {
+    onMemorized(q);
+  });
+}
+
+function onMemorized(q) {
+  const btn = document.getElementById('memorizeNextBtn');
+  btn.disabled = true;
+  btn.textContent = '記録中...';
+  const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
+  callApi('markLearned', { token: state.token, vocabId: q.vocabId, elapsedSec: elapsedSec })
+    .then(function () { nextQuestion(); })
+    .catch(function () {
+      btn.disabled = false;
+      btn.textContent = '覚えた → 次へ(もう一度お試しください)';
+    });
+}
+
+// ---- 4択クイズカード ----
+function renderQuizCard(q) {
+  const card = document.getElementById('quizCard');
+  card.innerHTML =
+    '<p class="quiz-word">' + escapeHtml_(q.english) + '</p>' +
+    '<p class="quiz-instruction">意味として正しいものを選んでください</p>' +
+    '<div id="quizChoices" class="choice-list"></div>' +
+    '<p id="quizFeedback" class="feedback-text"></p>';
 
   const choicesEl = document.getElementById('quizChoices');
-  choicesEl.innerHTML = '';
   q.choices.forEach(function (choice) {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
@@ -179,8 +223,12 @@ function renderQuestion() {
     btn.addEventListener('click', function () { onChoose(choice, btn); });
     choicesEl.appendChild(btn);
   });
+}
 
-  state.questionStartTime = Date.now();
+function escapeHtml_(str) {
+  const div = document.createElement('div');
+  div.textContent = str === undefined || str === null ? '' : String(str);
+  return div.innerHTML;
 }
 
 function onChoose(choice, btnEl) {

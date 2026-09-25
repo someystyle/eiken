@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>英検2級 家族合格システム</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2d6a4f">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ログイン画面 -->
+  <section id="screen-login" class="screen active">
+    <div class="card">
+      <h1>英検2級 家族合格システム</h1>
+      <p class="lead">最初の1回だけ、あなた専用のトークンを入力してください。<br>次回からは自動的にログインされます。</p>
+      <input id="tokenInput" type="text" placeholder="アクセストークンを入力" autocomplete="off">
+      <button id="loginBtn" class="btn-primary">はじめる</button>
+      <p id="loginError" class="error-text"></p>
+    </div>
+  </section>
+
+  <!-- ホーム / セッション申告画面 -->
+  <section id="screen-home" class="screen">
+    <header class="app-header">
+      <div class="user-name" id="userNameLabel"></div>
+      <button id="logoutBtn" class="btn-link">切替</button>
+    </header>
+
+    <div class="card">
+      <h2>今日のセッション</h2>
+      <p class="section-label">今使える時間</p>
+      <div class="chip-group" id="minutesChips">
+        <button class="chip" data-value="5">5分</button>
+        <button class="chip" data-value="10">10分</button>
+        <button class="chip" data-value="15">15分</button>
+        <button class="chip" data-value="30">30分</button>
+        <button class="chip" data-value="50">50分</button>
+        <button class="chip" data-value="60">60分+</button>
+      </div>
+
+      <p class="section-label">今のコンディション</p>
+      <div class="chip-group" id="conditionChips">
+        <button class="chip" data-value="元気">元気</button>
+        <button class="chip" data-value="普通">普通</button>
+        <button class="chip" data-value="疲れた">疲れた</button>
+      </div>
+
+      <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
+    </div>
+
+    <div class="card stats-card">
+      <h2>これまでの進捗</h2>
+      <div id="statsBody" class="stats-grid">読み込み中...</div>
+    </div>
+  </section>
+
+  <!-- クイズ画面 -->
+  <section id="screen-quiz" class="screen">
+    <header class="app-header">
+      <div id="quizProgress">0 / 0</div>
+      <button id="quitQuizBtn" class="btn-link">中断</button>
+    </header>
+
+    <div class="card quiz-card">
+      <p class="quiz-word" id="quizWord">-</p>
+      <p class="quiz-instruction">意味として正しいものを選んでください</p>
+      <div id="quizChoices" class="choice-list"></div>
+      <p id="quizFeedback" class="feedback-text"></p>
+    </div>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="screen-result" class="screen">
+    <div class="card">
+      <h2>おつかれさまでした！</h2>
+      <div id="resultBody" class="stats-grid"></div>
+      <button id="backHomeBtn" class="btn-primary">ホームに戻る</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

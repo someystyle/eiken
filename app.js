@@ -196,20 +196,24 @@ function onChoose(choice, btnEl) {
     elapsedSec: elapsedSec
   }).then(function (res) {
     const feedbackEl = document.getElementById('quizFeedback');
+    let delayMs = 1600; // 正解表示をしっかり確認できるよう長めに待つ
     if (res.ok && res.correct) {
       state.correctCount++;
-      btnEl.classList.add('correct');
+      btnEl.classList.add('correct', 'selected');
       feedbackEl.textContent = '正解！';
       feedbackEl.classList.add('correct');
     } else {
-      btnEl.classList.add('incorrect');
+      // 選んだ選択肢には「不正解(選択した)」の色を、正解の選択肢には「正解」の色を、
+      // 次の問題に進むまでの間ずっと表示し続ける。
+      btnEl.classList.add('incorrect', 'selected');
       feedbackEl.textContent = res.ok ? ('不正解… 正解は「' + res.answer + '」') : 'エラーが発生しました';
       feedbackEl.classList.add('incorrect');
       document.querySelectorAll('.choice-btn').forEach(function (b) {
         if (res.ok && b.textContent === res.answer) b.classList.add('correct');
       });
+      delayMs = 2600; // 不正解時は正解を確認する時間をさらに長くする
     }
-    setTimeout(nextQuestion, 900);
+    setTimeout(nextQuestion, delayMs);
   });
 }
 

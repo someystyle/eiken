@@ -189,23 +189,28 @@ function onChoose(choice, btnEl) {
 
   document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = true; });
 
+  // クリックした瞬間に、通信の結果を待たず「選んだ」ことがすぐ分かる色を付ける
+  // (GASとの通信には3-4節の通り1〜2秒程度かかることがあるため、待ち時間中も無反応に見えないようにする)
+  btnEl.classList.add('pending', 'selected');
+
   callApi('submitAnswer', {
     token: state.token,
     vocabId: q.vocabId,
     selected: choice,
     elapsedSec: elapsedSec
   }).then(function (res) {
+    btnEl.classList.remove('pending');
     const feedbackEl = document.getElementById('quizFeedback');
     let delayMs = 1600; // 正解表示をしっかり確認できるよう長めに待つ
     if (res.ok && res.correct) {
       state.correctCount++;
-      btnEl.classList.add('correct', 'selected');
+      btnEl.classList.add('correct');
       feedbackEl.textContent = '正解！';
       feedbackEl.classList.add('correct');
     } else {
       // 選んだ選択肢には「不正解(選択した)」の色を、正解の選択肢には「正解」の色を、
       // 次の問題に進むまでの間ずっと表示し続ける。
-      btnEl.classList.add('incorrect', 'selected');
+      btnEl.classList.add('incorrect');
       feedbackEl.textContent = res.ok ? ('不正解… 正解は「' + res.answer + '」') : 'エラーが発生しました';
       feedbackEl.classList.add('incorrect');
       document.querySelectorAll('.choice-btn').forEach(function (b) {
@@ -214,6 +219,13 @@ function onChoose(choice, btnEl) {
       delayMs = 2600; // 不正解時は正解を確認する時間をさらに長くする
     }
     setTimeout(nextQuestion, delayMs);
+  }).catch(function () {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('quizFeedback');
+    feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
+    feedbackEl.classList.add('incorrect');
+    document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = false; });
+    btnEl.classList.remove('selected');
   });
 }
 

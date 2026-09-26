@@ -196,7 +196,14 @@ input[type="text"] {
   white-space: pre-wrap;
   margin-bottom: 16px;
 }
-.reading-instruction { text-align: left; margin-bottom: 16px; }
+.reading-instruction { text-align: left; margin-bottom: 16px; font-weight: 600; color: var(--text); }
+.reading-blank {
+  background: #ffe9a8;
+  color: inherit;
+  font-weight: 700;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
 
 .choice-list { display: flex; flex-direction: column; gap: 10px; }
 .choice-btn {

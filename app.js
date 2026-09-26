@@ -283,13 +283,25 @@ function escapeHtml_(str) {
 // ---- Reading過去問カード (4-2節・6-3節) ----
 function renderReadingCard(q) {
   const card = document.getElementById('quizCard');
-  const instruction = q.sectionType === '空所補充'
-    ? '英文中の( )に入れるのに最も適切なものを選んでください'
+  const isBlank = q.sectionType === '空所補充';
+  const instruction = isBlank
+    ? ('英文中の網掛けの( ' + q.blankNumber + ' )に入れるのに最も適切なものを選んでください')
     : (q.questionText ? escapeHtml_(q.questionText) : '内容に最も合うものを選んでください');
+
+  let passageHtml = escapeHtml_(q.passage);
+  if (isBlank && q.blankNumber) {
+    // 同じパッセージに複数の空所番号があるため、「今どの番号を答えているか」を
+    // 網掛け表示で示す(付けないと(18)(19)(20)のどれに回答しているか分からなくなるため)
+    const pattern = new RegExp('\\(\\s*' + q.blankNumber + '\\s*\\)');
+    passageHtml = passageHtml.replace(pattern, function (match) {
+      return '<mark class="reading-blank">' + match + '</mark>';
+    });
+  }
+  passageHtml = passageHtml.replace(/\n/g, '<br>');
 
   card.innerHTML =
     '<p class="reading-label">Reading</p>' +
-    '<div class="reading-passage">' + escapeHtml_(q.passage).replace(/\n/g, '<br>') + '</div>' +
+    '<div class="reading-passage">' + passageHtml + '</div>' +
     '<p class="quiz-instruction reading-instruction">' + instruction + '</p>' +
     '<div id="quizChoices" class="choice-list"></div>' +
     '<p id="quizFeedback" class="feedback-text"></p>';
@@ -302,6 +314,11 @@ function renderReadingCard(q) {
     btn.addEventListener('click', function () { onChooseReading(idx + 1, btn); });
     choicesEl.appendChild(btn);
   });
+
+  if (isBlank && q.blankNumber) {
+    const markEl = card.querySelector('.reading-blank');
+    if (markEl) markEl.scrollIntoView({ block: 'center' });
+  }
 }
 
 function onChooseReading(selectedIndex, btnEl) {

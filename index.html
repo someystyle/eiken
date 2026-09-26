@@ -27,8 +27,18 @@
   <section id="screen-home" class="screen">
     <header class="app-header">
       <div class="user-name" id="userNameLabel"></div>
-      <button id="logoutBtn" class="btn-link">切替</button>
+      <button id="logoutBtn" class="btn-link">アカウント切替</button>
     </header>
+
+    <div class="card" id="debugModeCard" style="display:none;">
+      <h2>出題形式(確認用アカウント限定)</h2>
+      <p class="section-label">出題モード</p>
+      <div class="chip-group" id="debugModeChips">
+        <button class="chip selected" data-value="auto">自動(通常)</button>
+        <button class="chip" data-value="memorize">覚えるのみ</button>
+        <button class="chip" data-value="quiz">4択のみ</button>
+      </div>
+    </div>
 
     <div class="card">
       <h2>今日のセッション</h2>

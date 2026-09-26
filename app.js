@@ -11,6 +11,7 @@ const state = {
   user: null,
   minutes: null,
   condition: null,
+  debugMode: 'auto', // 確認用アカウント限定。'auto' | 'memorize' | 'quiz'
   questions: [],
   currentIndex: 0,
   correctCount: 0,
@@ -58,12 +59,15 @@ window.addEventListener('DOMContentLoaded', function () {
     safeRemoveLocalStorage(LS_TOKEN_KEY);
     state.token = null;
     state.user = null;
+    state.debugMode = 'auto';
     document.getElementById('tokenInput').value = '';
+    document.getElementById('debugModeCard').style.display = 'none';
     showScreen('screen-login');
   });
 
   setupChipGroup('minutesChips', function (val) { state.minutes = val; updateStartBtn(); });
   setupChipGroup('conditionChips', function (val) { state.condition = val; updateStartBtn(); });
+  setupChipGroup('debugModeChips', function (val) { state.debugMode = val; });
 
   document.getElementById('startBtn').addEventListener('click', startSession);
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
@@ -115,6 +119,8 @@ function doLogin(token, silent) {
     state.user = res.user;
     safeSetLocalStorage(LS_TOKEN_KEY, token);
     document.getElementById('userNameLabel').textContent = res.user.name + ' さん';
+    // 保護者確認用アカウントだけ、出題形式を任意に指定できるデバッグ欄を出す
+    document.getElementById('debugModeCard').style.display = (res.user.role === '保護者確認用') ? '' : 'none';
     showScreen('screen-home');
     loadStats();
   }).catch(function () {
@@ -150,7 +156,12 @@ function statItem(value, label) {
 function startSession() {
   showScreen('screen-quiz');
   document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題中...</p>';
-  callApi('getQuiz', { token: state.token, minutes: state.minutes, condition: state.condition }).then(function (res) {
+  const params = { token: state.token, minutes: state.minutes, condition: state.condition };
+  // 保護者確認用アカウントが「自動」以外を選んだ場合のみ、出題形式を強制指定する
+  if (state.user && state.user.role === '保護者確認用' && state.debugMode !== 'auto') {
+    params.mode = state.debugMode;
+  }
+  callApi('getQuiz', params).then(function (res) {
     if (!res.ok || !res.questions || res.questions.length === 0) {
       document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題できる問題がありません</p>';
       return;

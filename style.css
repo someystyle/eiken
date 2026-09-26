@@ -325,3 +325,38 @@ input[type="text"] {
   font-weight: 600;
   margin: 0 0 16px;
 }
+
+/* 目標試験日とペース診断(13章) */
+.pace-diagnosis-body { margin-bottom: 8px; }
+.pace-skill-list { margin-top: 12px; }
+.pace-skill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.pace-skill-row:last-child { border-bottom: none; }
+.pace-skill-name { font-weight: 600; }
+.pace-skill-status { color: var(--muted); text-align: right; }
+.pace-skill-row.pace-ok .pace-skill-status { color: var(--success); font-weight: 600; }
+.pace-skill-row.pace-behind .pace-skill-status { color: var(--danger); font-weight: 600; }
+
+.exam-score-inputs { margin: 12px 0; }
+.exam-score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.exam-score-label { font-size: 13px; font-weight: 600; flex: 1; }
+.exam-score-input {
+  width: 80px;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: right;
+}

@@ -18,7 +18,9 @@ const state = {
   questionStartTime: null,
   listeningReplayCount: 0, // 現在の設問で「もう一度聞く」を押した回数
   currentPractice: null, // Writing/Speaking練習中の課題データ
-  practiceStartTime: null
+  practiceStartTime: null,
+  examResult: null, // 受験結果フォームで選択中の合格/不合格
+  currentTargetExamDate: null // 現在登録されている目標試験日(結果記録フォームの表示判定に使う)
 };
 
 // ---- 画面切替 ----
@@ -97,6 +99,20 @@ window.addEventListener('DOMContentLoaded', function () {
     form.style.display = (form.style.display === 'none') ? '' : 'none';
   });
   document.getElementById('submitPauseBtn').addEventListener('click', submitPausePeriod);
+
+  document.getElementById('toggleExamFormBtn').addEventListener('click', function () {
+    const form = document.getElementById('examForm');
+    form.style.display = (form.style.display === 'none') ? '' : 'none';
+  });
+  document.getElementById('submitExamBtn').addEventListener('click', submitExamDate);
+
+  renderExamResultScoreInputs();
+  document.getElementById('toggleExamResultFormBtn').addEventListener('click', function () {
+    const form = document.getElementById('examResultForm');
+    form.style.display = (form.style.display === 'none') ? '' : 'none';
+  });
+  setupChipGroup('examResultChips', function (val) { state.examResult = val; });
+  document.getElementById('submitExamResultBtn').addEventListener('click', submitExamResult);
 });
 
 function stopSpeech_() {
@@ -168,6 +184,7 @@ function loadStats() {
     skillBody.textContent = '通信に失敗しました。';
   });
   loadPausePeriods();
+  loadExamInfo();
 }
 
 // ---- 休止期間 (12章) ----
@@ -201,6 +218,12 @@ function submitPausePeriod() {
     errEl.textContent = '開始日と終了日を入力してください。';
     return;
   }
+  // 一部ブラウザ/端末では年が4桁を超えて入力できてしまうことがあるため、念のため形式を検証する
+  const dateFormat = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateFormat.test(startDate) || !dateFormat.test(endDate)) {
+    errEl.textContent = '日付の形式が正しくありません(年は4桁で入力してください)。';
+    return;
+  }
   if (endDate < startDate) {
     errEl.textContent = '終了日は開始日より後にしてください。';
     return;
@@ -216,6 +239,133 @@ function submitPausePeriod() {
     document.getElementById('pauseReasonInput').value = '';
     document.getElementById('pauseForm').style.display = 'none';
     loadPausePeriods();
+  }).catch(function () {
+    btn.disabled = false;
+    errEl.textContent = '通信に失敗しました。';
+  });
+}
+
+// ---- 目標試験日とペース診断 (13章) ----
+function loadExamInfo() {
+  const body = document.getElementById('paceDiagnosisBody');
+  body.textContent = '読み込み中...';
+  callApi('getPaceDiagnosis', { token: state.token }).then(function (res) {
+    if (!res.ok) { body.textContent = '取得に失敗しました。'; return; }
+    body.innerHTML = renderPaceDiagnosis(res);
+  }).catch(function () { body.textContent = '通信に失敗しました。'; });
+
+  callApi('getExamDates', { token: state.token }).then(function (res) {
+    if (!res.ok) return;
+    state.currentTargetExamDate = res.currentTargetDate;
+    const resultToggleBtn = document.getElementById('toggleExamResultFormBtn');
+    resultToggleBtn.style.display = res.currentTargetDate ? '' : 'none';
+
+    const historyEl = document.getElementById('examHistory');
+    const finished = (res.examDates || []).filter(function (d) { return d.result !== '未受験'; });
+    if (finished.length === 0) {
+      historyEl.innerHTML = '';
+      return;
+    }
+    historyEl.innerHTML = '<p class="section-label">受験履歴</p>' + finished.map(function (d) {
+      return '<div class="pause-item">' +
+        '<span class="pause-item-dates">' + d.examDate + '</span>' +
+        '<span class="pause-item-reason">' + escapeHtml_(d.result) + '</span>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function renderPaceDiagnosis(res) {
+  if (!res.hasTarget) {
+    return '<p class="memorize-note">目標試験日がまだ登録されていません。下のボタンから登録してください。</p>';
+  }
+  const phaseNote = {
+    '基礎固め期': '残り期間はまだ余裕があります。大まかなペースを確認しつつ、焦らず基礎を固めましょう。',
+    '標準管理期': '合格ラインまでの差と残り週数から、必要な伸びを計算しています。',
+    '直前仕上げ期': '直前期です。新しい語彙より、弱点の総復習や過去問演習を優先しましょう。'
+  }[res.phase] || '';
+
+  let html = '<p class="quiz-instruction reading-instruction">目標試験日: ' + escapeHtml_(res.examDate) +
+    '(あと' + res.daysLeft + '日) — <strong>' + escapeHtml_(res.phase) + '</strong></p>' +
+    '<p class="memorize-note">' + phaseNote + '</p>';
+
+  html += '<div class="pace-skill-list">';
+  res.skillDiagnoses.forEach(function (d) {
+    const label = SKILL_LABELS[d.skill] || d.skill;
+    let statusText = 'データ収集中(まだ判定できません)';
+    let statusClass = '';
+    if (d.onTrack === true) { statusText = '順調なペースです'; statusClass = 'pace-ok'; }
+    else if (d.onTrack === false) {
+      statusText = 'このペースだと届きにくいかもしれません' +
+        (d.extraMinutesPerWeek > 0 ? '(目安: あと週' + d.extraMinutesPerWeek + '分)' : '');
+      statusClass = 'pace-behind';
+    }
+    html += '<div class="pace-skill-row ' + statusClass + '">' +
+      '<span class="pace-skill-name">' + escapeHtml_(label) + (d.skill === res.bottleneck ? ' ⚠' : '') + '</span>' +
+      '<span class="pace-skill-status">' + statusText + '</span>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function submitExamDate() {
+  const examDate = document.getElementById('examDateInput').value;
+  const errEl = document.getElementById('examError');
+  errEl.textContent = '';
+  if (!examDate) { errEl.textContent = '試験日を入力してください。'; return; }
+
+  const btn = document.getElementById('submitExamBtn');
+  btn.disabled = true;
+  callApi('registerExamDate', { token: state.token, examDate: examDate }).then(function (res) {
+    btn.disabled = false;
+    if (!res.ok) { errEl.textContent = '登録に失敗しました。'; return; }
+    document.getElementById('examDateInput').value = '';
+    document.getElementById('examForm').style.display = 'none';
+    loadExamInfo();
+  }).catch(function () {
+    btn.disabled = false;
+    errEl.textContent = '通信に失敗しました。';
+  });
+}
+
+function renderExamResultScoreInputs() {
+  const container = document.getElementById('examResultScoreInputs');
+  container.innerHTML = SKILLS_FOR_EXAM.map(function (skill) {
+    const label = SKILL_LABELS[skill] || skill;
+    return '<div class="exam-score-row">' +
+      '<span class="exam-score-label">' + escapeHtml_(label) + '</span>' +
+      '<input type="number" min="0" max="100" class="exam-score-input" data-skill="' + skill + '" placeholder="0〜100">' +
+      '</div>';
+  }).join('');
+}
+
+function submitExamResult() {
+  const errEl = document.getElementById('examResultError');
+  errEl.textContent = '';
+  if (!state.currentTargetExamDate) { errEl.textContent = '目標試験日が登録されていません。'; return; }
+  if (!state.examResult) { errEl.textContent = '結果(合格/不合格)を選んでください。'; return; }
+
+  const scores = {};
+  document.querySelectorAll('.exam-score-input').forEach(function (input) {
+    if (input.value !== '') scores[input.dataset.skill] = Number(input.value);
+  });
+
+  const btn = document.getElementById('submitExamResultBtn');
+  btn.disabled = true;
+  callApi('submitExamResult', {
+    token: state.token,
+    examDate: state.currentTargetExamDate,
+    result: state.examResult,
+    scores: JSON.stringify(scores)
+  }).then(function (res) {
+    btn.disabled = false;
+    if (!res.ok) { errEl.textContent = '記録に失敗しました。'; return; }
+    document.getElementById('examResultForm').style.display = 'none';
+    state.examResult = null;
+    document.querySelectorAll('#examResultChips .chip').forEach(function (c) { c.classList.remove('selected'); });
+    loadExamInfo();
+    loadStats();
   }).catch(function () {
     btn.disabled = false;
     errEl.textContent = '通信に失敗しました。';
@@ -244,6 +394,7 @@ const SKILL_LABELS = {
   Writing: 'ライティング',
   Speaking: 'スピーキング'
 };
+const SKILLS_FOR_EXAM = ['Vocabulary', 'Reading', 'Listening', 'Writing', 'Speaking'];
 
 function renderSkillScores(skillScores) {
   return skillScores.map(function (s) {

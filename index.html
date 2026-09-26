@@ -83,15 +83,40 @@
     </div>
 
     <div class="card">
+      <h2>目標試験日とペース診断(13章)</h2>
+      <div id="paceDiagnosisBody" class="pace-diagnosis-body">読み込み中...</div>
+      <button id="toggleExamFormBtn" class="btn-link pause-toggle-btn">＋ 目標試験日を登録する</button>
+      <div id="examForm" class="pause-form" style="display:none;">
+        <p class="section-label">試験日</p>
+        <input type="date" id="examDateInput" min="2024-01-01" max="2035-12-31">
+        <button id="submitExamBtn" class="btn-primary">登録する</button>
+        <p id="examError" class="error-text"></p>
+      </div>
+      <button id="toggleExamResultFormBtn" class="btn-link pause-toggle-btn" style="display:none;">結果を記録する</button>
+      <div id="examResultForm" class="pause-form" style="display:none;">
+        <p class="section-label">結果</p>
+        <div class="chip-group" id="examResultChips">
+          <button class="chip" data-value="合格">合格</button>
+          <button class="chip" data-value="不合格">不合格</button>
+        </div>
+        <p class="memorize-note">技能別スコアが分かれば入力してください(任意・0〜100の目安値でOK)。分からない項目は空欄のままで構いません。</p>
+        <div id="examResultScoreInputs" class="exam-score-inputs"></div>
+        <button id="submitExamResultBtn" class="btn-primary">記録する</button>
+        <p id="examResultError" class="error-text"></p>
+      </div>
+      <div id="examHistory" class="pause-list"></div>
+    </div>
+
+    <div class="card">
       <h2>休止期間(12章)</h2>
       <p class="section-label">定期テスト・部活合宿など、学習をお休みする期間を登録できます</p>
       <div id="pauseList" class="pause-list"></div>
       <button id="togglePauseFormBtn" class="btn-link pause-toggle-btn">＋ 休止期間を登録する</button>
       <div id="pauseForm" class="pause-form" style="display:none;">
         <p class="section-label">開始日</p>
-        <input type="date" id="pauseStartInput">
+        <input type="date" id="pauseStartInput" min="2024-01-01" max="2035-12-31">
         <p class="section-label">終了日</p>
-        <input type="date" id="pauseEndInput">
+        <input type="date" id="pauseEndInput" min="2024-01-01" max="2035-12-31">
         <p class="section-label">理由(任意)</p>
         <input type="text" id="pauseReasonInput" placeholder="例: 定期テスト、部活合宿">
         <button id="submitPauseBtn" class="btn-primary">登録する</button>

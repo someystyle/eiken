@@ -603,7 +603,7 @@ function renderPracticeCard(prompt) {
     '<p class="practice-step-label">② AIコーチに相談する</p>' +
     (hasUrl
       ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>' +
-        '<p class="memorize-note">タップすると課題文をコピーしつつNotebookLMが開きます。①で作った自分の答えも一緒にNotebookLMのチャット欄に貼り付けて送信し、評価してもらってください。</p>'
+        '<p class="memorize-note">タップすると、採点を依頼する文章(課題+ルーブリックで採点してという指示+解答を書く欄)がコピーされ、NotebookLMが開きます。NotebookLMのチャット欄に貼り付けたら、「(ここに自分の解答を貼り付けてください)」の部分を①で作った自分の解答に書き換えてから送信してください。</p>'
       : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
 
     '<p class="practice-step-label">③ フィードバックを見て、一番弱かった項目を選ぶ</p>' +
@@ -625,9 +625,10 @@ function renderPracticeCard(prompt) {
 
   if (hasUrl) {
     document.getElementById('notebookBtn').addEventListener('click', function () {
-      // 10-3節: タップ削減のため、課題文をクリップボードにコピーしつつNotebookLMを開く。
-      // 本人はチャット欄に貼り付けて送信するだけでよい。
-      copyToClipboard_(prompt.task);
+      // 10-3節・8-5節: タップ削減のため、「ルーブリックで採点して」という依頼文+課題+
+      // 解答を書く欄をセットにした文章をクリップボードにコピーしつつNotebookLMを開く。
+      // 本人は解答欄を書き換えてチャット欄に貼り付け、送信するだけでよい。
+      copyToClipboard_(prompt.notebooklmMessage || prompt.task);
       window.open(prompt.notebooklmUrl, '_blank');
       // AIコーチに相談したら、弱点の自己申告ボタンを押せるようにする
       document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });

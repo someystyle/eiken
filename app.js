@@ -596,6 +596,7 @@ function renderPracticeCard(prompt) {
     '<p class="reading-label">' + escapeHtml_(prompt.skill + '・' + prompt.promptType) + '</p>' +
 
     '<p class="practice-step-label">① 課題に取り組む</p>' +
+    '<p class="practice-instruction">' + escapeHtml_(prompt.instruction || '課題に取り組んでください。') + '</p>' +
     '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
     '<p class="memorize-note">紙やノートに実際に英文を書いて(または声に出して)、答えを作ってみましょう。</p>' +
 

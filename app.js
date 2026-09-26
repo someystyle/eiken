@@ -11,11 +11,12 @@ const state = {
   user: null,
   minutes: null,
   condition: null,
-  debugMode: 'auto', // 確認用アカウント限定。'auto' | 'memorize' | 'quiz'
+  debugMode: 'auto', // 確認用アカウント限定。'auto' | 'memorize' | 'quiz' | 'reading' | 'listening'
   questions: [],
   currentIndex: 0,
   correctCount: 0,
-  questionStartTime: null
+  questionStartTime: null,
+  listeningReplayCount: 0 // 現在の設問で「もう一度聞く」を押した回数
 };
 
 // ---- 画面切替 ----
@@ -309,11 +310,11 @@ function renderReadingCard(q) {
     '<p id="quizFeedback" class="feedback-text"></p>';
 
   const choicesEl = document.getElementById('quizChoices');
-  q.choices.forEach(function (choice, idx) {
+  q.choices.forEach(function (choice) {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
     btn.textContent = choice;
-    btn.addEventListener('click', function () { onChooseReading(idx + 1, btn); });
+    btn.addEventListener('click', function () { onChooseReading(choice, btn); });
     choicesEl.appendChild(btn);
   });
 
@@ -323,7 +324,7 @@ function renderReadingCard(q) {
   }
 }
 
-function onChooseReading(selectedIndex, btnEl) {
+function onChooseReading(choice, btnEl) {
   const q = state.questions[state.currentIndex];
   const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
 
@@ -333,7 +334,7 @@ function onChooseReading(selectedIndex, btnEl) {
   callApi('submitReadingAnswer', {
     token: state.token,
     questionId: q.questionId,
-    selected: selectedIndex,
+    selected: choice,
     elapsedSec: elapsedSec
   }).then(function (res) {
     btnEl.classList.remove('pending');
@@ -346,12 +347,12 @@ function onChooseReading(selectedIndex, btnEl) {
       feedbackEl.classList.add('correct');
     } else {
       btnEl.classList.add('incorrect');
-      feedbackEl.textContent = res.ok ? '不正解…' : 'エラーが発生しました';
+      feedbackEl.textContent = res.ok ? ('不正解… 正解は「' + res.answer + '」') : 'エラーが発生しました';
       feedbackEl.classList.add('incorrect');
       if (res.ok) {
-        const choiceButtons = document.querySelectorAll('.choice-btn');
-        const correctBtn = choiceButtons[res.correctIndex - 1];
-        if (correctBtn) correctBtn.classList.add('correct');
+        document.querySelectorAll('.choice-btn').forEach(function (b) {
+          if (b.textContent === res.answer) b.classList.add('correct');
+        });
       }
       delayMs = 2600;
     }
@@ -374,13 +375,13 @@ function ttsCleanScript_(script) {
   return String(script || '').replace(/☆☆|★|☆/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function speakText_(text) {
+function speakText_(text, rate) {
   try {
     if (!window.speechSynthesis) return false;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    utterance.rate = 0.95;
+    utterance.rate = rate || 1.0;
     window.speechSynthesis.speak(utterance);
     return true;
   } catch (e) {
@@ -388,12 +389,23 @@ function speakText_(text) {
   }
 }
 
+// 再生速度(0.65〜1.00)を「標準に対する差」のレベル表示に変換する(例: 0.85→レベル-3)
+function speedLevelLabel_(rate) {
+  const level = Math.round((rate - 1.0) / 0.05);
+  const pct = Math.round(rate * 100);
+  return level === 0 ? ('標準速度(' + pct + '%)') : ('標準速度のレベル' + level + '(' + pct + '%)');
+}
+
 function renderListeningCard(q) {
   const card = document.getElementById('quizCard');
   const partLabel = q.sectionType ? ('Listening ' + q.sectionType) : 'Listening';
+  const speedRate = q.speedRate || 1.0;
+  state.listeningReplayCount = 0;
 
   card.innerHTML =
     '<p class="reading-label">' + escapeHtml_(partLabel) + '</p>' +
+    '<p class="listening-speed-label">再生速度: ' + escapeHtml_(speedLevelLabel_(speedRate)) +
+    '(正答率が上がると自動で速くなります)</p>' +
     '<button id="listeningPlayBtn" class="btn-primary listening-play-btn">🔊 音声を再生</button>' +
     '<p class="quiz-instruction reading-instruction">' + escapeHtml_(q.questionText || '内容に最も合うものを選んでください') + '</p>' +
     '<div id="quizChoices" class="choice-list"></div>' +
@@ -401,26 +413,30 @@ function renderListeningCard(q) {
     '<div id="listeningScript" class="reading-passage listening-script" style="display:none;"></div>';
 
   document.getElementById('listeningPlayBtn').addEventListener('click', function () {
-    const ok = speakText_(ttsCleanScript_(q.script));
+    state.listeningReplayCount++;
+    const ok = speakText_(ttsCleanScript_(q.script), speedRate);
+    const btn = document.getElementById('listeningPlayBtn');
     if (!ok) {
-      document.getElementById('listeningPlayBtn').textContent = 'この端末では読み上げに対応していません';
+      btn.textContent = 'この端末では読み上げに対応していません';
+    } else {
+      btn.textContent = '🔁 もう一度聞く(' + state.listeningReplayCount + '回目)';
     }
   });
 
   const choicesEl = document.getElementById('quizChoices');
-  q.choices.forEach(function (choice, idx) {
+  q.choices.forEach(function (choice) {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
     btn.textContent = choice;
-    btn.addEventListener('click', function () { onChooseListening(idx + 1, btn); });
+    btn.addEventListener('click', function () { onChooseListening(choice, btn); });
     choicesEl.appendChild(btn);
   });
 
-  // 出題中は自動で1回再生しておく(再生ボタンの押し忘れ対策)
-  speakText_(ttsCleanScript_(q.script));
+  // 出題中は自動で1回再生しておく(再生ボタンの押し忘れ対策。リピート回数にはカウントしない)
+  speakText_(ttsCleanScript_(q.script), speedRate);
 }
 
-function onChooseListening(selectedIndex, btnEl) {
+function onChooseListening(choice, btnEl) {
   const q = state.questions[state.currentIndex];
   const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
 
@@ -431,8 +447,9 @@ function onChooseListening(selectedIndex, btnEl) {
   callApi('submitListeningAnswer', {
     token: state.token,
     questionId: q.questionId,
-    selected: selectedIndex,
-    elapsedSec: elapsedSec
+    selected: choice,
+    elapsedSec: elapsedSec,
+    replayCount: state.listeningReplayCount || 0
   }).then(function (res) {
     btnEl.classList.remove('pending');
     const feedbackEl = document.getElementById('quizFeedback');
@@ -444,12 +461,12 @@ function onChooseListening(selectedIndex, btnEl) {
       feedbackEl.classList.add('correct');
     } else {
       btnEl.classList.add('incorrect');
-      feedbackEl.textContent = res.ok ? '不正解…' : 'エラーが発生しました';
+      feedbackEl.textContent = res.ok ? ('不正解… 正解は「' + res.answer + '」') : 'エラーが発生しました';
       feedbackEl.classList.add('incorrect');
       if (res.ok) {
-        const choiceButtons = document.querySelectorAll('.choice-btn');
-        const correctBtn = choiceButtons[res.correctIndex - 1];
-        if (correctBtn) correctBtn.classList.add('correct');
+        document.querySelectorAll('.choice-btn').forEach(function (b) {
+          if (b.textContent === res.answer) b.classList.add('correct');
+        });
       }
       delayMs = 3200;
     }

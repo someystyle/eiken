@@ -200,6 +200,9 @@ input[type="text"] {
 .listening-play-btn { margin-bottom: 20px; }
 .listening-script { margin-top: 16px; font-style: italic; }
 .listening-speed-label { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+.practice-btn { margin-bottom: 10px; }
+.practice-btn:last-child { margin-bottom: 0; }
 .reading-blank {
   background: #ffe9a8;
   color: inherit;

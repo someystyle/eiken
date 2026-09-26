@@ -64,6 +64,13 @@
       <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
     </div>
 
+    <div class="card">
+      <h2>Writing / Speaking 練習</h2>
+      <p class="section-label">NotebookLM(AIコーチ)に貼り付けてフィードバックをもらいます</p>
+      <button id="writingPracticeBtn" class="btn-primary practice-btn">✏️ Writingを1問やる</button>
+      <button id="speakingPracticeBtn" class="btn-primary practice-btn">🗣️ Speakingを1問やる</button>
+    </div>
+
     <div class="card stats-card">
       <h2>これまでの進捗</h2>
       <div id="statsBody" class="stats-grid">読み込み中...</div>
@@ -84,6 +91,15 @@
     </header>
 
     <div class="card quiz-card" id="quizCard"></div>
+  </section>
+
+  <!-- Writing/Speaking練習画面 -->
+  <section id="screen-practice" class="screen">
+    <header class="app-header">
+      <div class="user-name" id="practiceTitle">練習</div>
+      <button id="quitPracticeBtn" class="btn-link">中断</button>
+    </header>
+    <div class="card" id="practiceCard"></div>
   </section>
 
   <!-- 結果画面 -->

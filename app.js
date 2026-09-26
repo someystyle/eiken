@@ -16,7 +16,9 @@ const state = {
   currentIndex: 0,
   correctCount: 0,
   questionStartTime: null,
-  listeningReplayCount: 0 // 現在の設問で「もう一度聞く」を押した回数
+  listeningReplayCount: 0, // 現在の設問で「もう一度聞く」を押した回数
+  currentPractice: null, // Writing/Speaking練習中の課題データ
+  practiceStartTime: null
 };
 
 // ---- 画面切替 ----
@@ -79,6 +81,13 @@ window.addEventListener('DOMContentLoaded', function () {
   });
   document.getElementById('backHomeBtn').addEventListener('click', function () {
     stopSpeech_();
+    showScreen('screen-home');
+    loadStats();
+  });
+
+  document.getElementById('writingPracticeBtn').addEventListener('click', function () { startPractice('Writing'); });
+  document.getElementById('speakingPracticeBtn').addEventListener('click', function () { startPractice('Speaking'); });
+  document.getElementById('quitPracticeBtn').addEventListener('click', function () {
     showScreen('screen-home');
     loadStats();
   });
@@ -558,4 +567,103 @@ function showResult() {
     statItem(state.questions.length, '取り組んだ問題数'),
     statItem(state.correctCount, '正解数')
   ].join('');
+}
+
+// ---- Writing/Speaking練習 (8-5節・10章) ----
+// 自動採点はせず、NotebookLM(AIコーチ)に課題を貼り付けてフィードバックをもらい、
+// 一番弱かった項目を自己申告してもらう。
+function startPractice(skill) {
+  document.getElementById('practiceTitle').textContent = skill === 'Speaking' ? 'Speaking練習' : 'Writing練習';
+  const card = document.getElementById('practiceCard');
+  card.innerHTML = '<p class="quiz-word">出題中...</p>';
+  showScreen('screen-practice');
+
+  callApi('getPracticePrompt', { token: state.token, skill: skill }).then(function (res) {
+    if (!res.ok) { card.innerHTML = '<p class="quiz-word">取得に失敗しました</p>'; return; }
+    if (!res.prompt) { card.innerHTML = '<p class="quiz-word">出題できる課題がありません</p>'; return; }
+    state.currentPractice = res.prompt;
+    renderPracticeCard(res.prompt);
+  }).catch(function () {
+    card.innerHTML = '<p class="quiz-word">通信に失敗しました</p>';
+  });
+}
+
+function renderPracticeCard(prompt) {
+  const card = document.getElementById('practiceCard');
+  const hasUrl = !!prompt.notebooklmUrl;
+
+  card.innerHTML =
+    '<p class="reading-label">' + escapeHtml_(prompt.skill + '・' + prompt.promptType) + '</p>' +
+    '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
+    (hasUrl
+      ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>'
+      : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
+    '<p class="quiz-instruction reading-instruction">AIコーチ(NotebookLM)からのフィードバックで、一番弱かった項目はどれですか?</p>' +
+    '<div id="axisChoices" class="choice-list"></div>' +
+    '<p id="practiceFeedback" class="feedback-text"></p>';
+
+  if (hasUrl) {
+    document.getElementById('notebookBtn').addEventListener('click', function () {
+      // 10-3節: タップ削減のため、課題文をクリップボードにコピーしつつNotebookLMを開く。
+      // 本人はチャット欄に貼り付けて送信するだけでよい。
+      copyToClipboard_(prompt.task);
+      window.open(prompt.notebooklmUrl, '_blank');
+    });
+  }
+
+  const axisEl = document.getElementById('axisChoices');
+  prompt.axes.forEach(function (axis) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = axis;
+    btn.addEventListener('click', function () { onSubmitPractice(axis, btn); });
+    axisEl.appendChild(btn);
+  });
+
+  state.practiceStartTime = Date.now();
+}
+
+function copyToClipboard_(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function onSubmitPractice(axis, btnEl) {
+  const prompt = state.currentPractice;
+  const elapsedSec = Math.round((Date.now() - (state.practiceStartTime || Date.now())) / 1000);
+
+  document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = true; });
+  btnEl.classList.add('pending', 'selected');
+
+  callApi('submitPracticeAnswer', {
+    token: state.token,
+    skill: prompt.skill,
+    promptId: prompt.promptId,
+    weakAxis: axis,
+    elapsedSec: elapsedSec
+  }).then(function (res) {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('practiceFeedback');
+    if (res.ok) {
+      btnEl.classList.add('correct');
+      feedbackEl.textContent = '記録しました。お疲れさまでした！';
+      feedbackEl.classList.add('correct');
+    } else {
+      feedbackEl.textContent = 'エラーが発生しました';
+      feedbackEl.classList.add('incorrect');
+    }
+    setTimeout(function () {
+      showScreen('screen-home');
+      loadStats();
+    }, 1600);
+  }).catch(function () {
+    btnEl.classList.remove('pending', 'selected');
+    document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });
+    const feedbackEl = document.getElementById('practiceFeedback');
+    feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
+    feedbackEl.classList.add('incorrect');
+  });
 }

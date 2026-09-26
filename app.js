@@ -131,11 +131,17 @@ function doLogin(token, silent) {
 // ---- 進捗表示 (5-2節: 表示用スコアは下がらない) ----
 function loadStats() {
   const body = document.getElementById('statsBody');
+  const skillBody = document.getElementById('skillScoreBody');
   body.textContent = '読み込み中...';
+  skillBody.textContent = '読み込み中...';
   callApi('getStats', { token: state.token }).then(function (res) {
-    if (!res.ok) { body.textContent = '取得に失敗しました。'; return; }
+    if (!res.ok) { body.textContent = '取得に失敗しました。'; skillBody.textContent = '取得に失敗しました。'; return; }
     body.innerHTML = renderStatsGrid(res.stats);
-  }).catch(function () { body.textContent = '通信に失敗しました。'; });
+    skillBody.innerHTML = renderSkillScores(res.stats.skillScores || []);
+  }).catch(function () {
+    body.textContent = '通信に失敗しました。';
+    skillBody.textContent = '通信に失敗しました。';
+  });
 }
 
 function renderStatsGrid(stats) {
@@ -150,6 +156,36 @@ function renderStatsGrid(stats) {
 
 function statItem(value, label) {
   return '<div class="stat-item"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+}
+
+// ---- 技能別実力スコア (5章) ----
+const SKILL_LABELS = {
+  Vocabulary: '語彙',
+  Reading: 'リーディング',
+  Listening: 'リスニング',
+  Writing: 'ライティング',
+  Speaking: 'スピーキング'
+};
+
+function renderSkillScores(skillScores) {
+  return skillScores.map(function (s) {
+    const label = SKILL_LABELS[s.skill] || s.skill;
+    if (!s.implemented) {
+      return (
+        '<div class="skill-row skill-row-disabled">' +
+        '<div class="skill-row-head"><span>' + label + '</span><span class="skill-badge">未実装</span></div>' +
+        '<div class="skill-bar-track"><div class="skill-bar-fill" style="width:0%"></div></div>' +
+        '</div>'
+      );
+    }
+    const pct = Math.max(0, Math.min(100, s.displayScore));
+    return (
+      '<div class="skill-row">' +
+      '<div class="skill-row-head"><span>' + label + '</span><span>' + pct + '点</span></div>' +
+      '<div class="skill-bar-track"><div class="skill-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 // ---- セッション開始 (6-1節) ----

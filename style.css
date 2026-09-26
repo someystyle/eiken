@@ -122,6 +122,37 @@ input[type="text"] {
 .stat-value { font-size: 22px; font-weight: 700; color: var(--primary-dark); }
 .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
+/* 技能別実力スコア(5章) */
+.skill-row { margin-bottom: 14px; }
+.skill-row:last-child { margin-bottom: 0; }
+.skill-row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.skill-bar-track {
+  background: var(--bg);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+.skill-bar-fill {
+  background: var(--primary);
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.skill-row-disabled .skill-row-head { color: var(--muted); font-weight: 500; }
+.skill-badge {
+  font-size: 11px;
+  background: var(--bg);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .quiz-card { text-align: center; padding: 32px 20px; }
 .quiz-word { font-size: 32px; font-weight: 700; color: var(--primary-dark); margin: 12px 0 4px; }
 .quiz-instruction { color: var(--muted); font-size: 13px; margin-bottom: 24px; }

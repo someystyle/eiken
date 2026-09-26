@@ -173,6 +173,31 @@ input[type="text"] {
 .memorize-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
 #memorizeNextBtn { margin-top: 12px; }
 
+/* Readingカード(長文パッセージ+設問) */
+.reading-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: #e3f0e9;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+.reading-passage {
+  text-align: left;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  margin-bottom: 16px;
+}
+.reading-instruction { text-align: left; margin-bottom: 16px; }
+
 .choice-list { display: flex; flex-direction: column; gap: 10px; }
 .choice-btn {
   padding: 14px;

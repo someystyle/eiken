@@ -214,6 +214,8 @@ function renderQuestion() {
   document.getElementById('quizProgress').textContent = (state.currentIndex + 1) + ' / ' + state.questions.length;
   if (q.type === 'memorize') {
     renderMemorizeCard(q);
+  } else if (q.type === 'reading') {
+    renderReadingCard(q);
   } else {
     renderQuizCard(q);
   }
@@ -276,6 +278,73 @@ function escapeHtml_(str) {
   const div = document.createElement('div');
   div.textContent = str === undefined || str === null ? '' : String(str);
   return div.innerHTML;
+}
+
+// ---- Reading過去問カード (4-2節・6-3節) ----
+function renderReadingCard(q) {
+  const card = document.getElementById('quizCard');
+  const instruction = q.sectionType === '空所補充'
+    ? '英文中の( )に入れるのに最も適切なものを選んでください'
+    : (q.questionText ? escapeHtml_(q.questionText) : '内容に最も合うものを選んでください');
+
+  card.innerHTML =
+    '<p class="reading-label">Reading</p>' +
+    '<div class="reading-passage">' + escapeHtml_(q.passage).replace(/\n/g, '<br>') + '</div>' +
+    '<p class="quiz-instruction reading-instruction">' + instruction + '</p>' +
+    '<div id="quizChoices" class="choice-list"></div>' +
+    '<p id="quizFeedback" class="feedback-text"></p>';
+
+  const choicesEl = document.getElementById('quizChoices');
+  q.choices.forEach(function (choice, idx) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = choice;
+    btn.addEventListener('click', function () { onChooseReading(idx + 1, btn); });
+    choicesEl.appendChild(btn);
+  });
+}
+
+function onChooseReading(selectedIndex, btnEl) {
+  const q = state.questions[state.currentIndex];
+  const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
+
+  document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = true; });
+  btnEl.classList.add('pending', 'selected');
+
+  callApi('submitReadingAnswer', {
+    token: state.token,
+    questionId: q.questionId,
+    selected: selectedIndex,
+    elapsedSec: elapsedSec
+  }).then(function (res) {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('quizFeedback');
+    let delayMs = 1600;
+    if (res.ok && res.correct) {
+      state.correctCount++;
+      btnEl.classList.add('correct');
+      feedbackEl.textContent = '正解！';
+      feedbackEl.classList.add('correct');
+    } else {
+      btnEl.classList.add('incorrect');
+      feedbackEl.textContent = res.ok ? '不正解…' : 'エラーが発生しました';
+      feedbackEl.classList.add('incorrect');
+      if (res.ok) {
+        const choiceButtons = document.querySelectorAll('.choice-btn');
+        const correctBtn = choiceButtons[res.correctIndex - 1];
+        if (correctBtn) correctBtn.classList.add('correct');
+      }
+      delayMs = 2600;
+    }
+    setTimeout(nextQuestion, delayMs);
+  }).catch(function () {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('quizFeedback');
+    feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
+    feedbackEl.classList.add('incorrect');
+    document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = false; });
+    btnEl.classList.remove('selected');
+  });
 }
 
 function onChoose(choice, btnEl) {

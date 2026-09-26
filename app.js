@@ -87,6 +87,8 @@ window.addEventListener('DOMContentLoaded', function () {
     loadStats();
   });
 
+  document.getElementById('aiCoachBtn').addEventListener('click', onAiCoachClick_);
+
   document.getElementById('writingPracticeBtn').addEventListener('click', function () { startPractice('Writing'); });
   document.getElementById('speakingPracticeBtn').addEventListener('click', function () { startPractice('Speaking'); });
   document.getElementById('quitPracticeBtn').addEventListener('click', function () {
@@ -162,6 +164,8 @@ function doLogin(token, silent) {
     document.getElementById('userNameLabel').textContent = res.user.name + ' さん';
     // 保護者確認用アカウントだけ、出題形式を任意に指定できるデバッグ欄を出す
     document.getElementById('debugModeCard').style.display = (res.user.role === '保護者確認用') ? '' : 'none';
+    // 10-3節: 「AIコーチに相談」ボタンを常設し、週次更新直後は未読バッジを出す
+    updateAiCoachButton_(res.user);
     showScreen('screen-home');
     loadStats();
   }).catch(function () {
@@ -170,6 +174,32 @@ function doLogin(token, silent) {
 }
 
 // ---- 進捗表示 (5-2節: 表示用スコアは下がらない) ----
+// ---- AIコーチ(NotebookLM)ボタン (10-3節) ----
+function updateAiCoachButton_(user) {
+  const btn = document.getElementById('aiCoachBtn');
+  const badge = document.getElementById('aiCoachBadge');
+  const note = document.getElementById('aiCoachNote');
+  if (!user.notebooklmUrl) {
+    btn.style.display = 'none';
+    note.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  const unconfirmed = !!user.notebooklmUnconfirmed;
+  badge.style.display = unconfirmed ? '' : 'none';
+  note.style.display = unconfirmed ? '' : 'none';
+}
+
+function onAiCoachClick_() {
+  if (!state.user || !state.user.notebooklmUrl) return;
+  window.open(state.user.notebooklmUrl, '_blank');
+  if (state.user.notebooklmUnconfirmed) {
+    state.user.notebooklmUnconfirmed = false;
+    updateAiCoachButton_(state.user);
+    callApi('markNotebookSeen', { token: state.token }).catch(function () { /* ignore */ });
+  }
+}
+
 function loadStats() {
   const body = document.getElementById('statsBody');
   const skillBody = document.getElementById('skillScoreBody');

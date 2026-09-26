@@ -606,21 +606,46 @@ function renderPracticeCard(prompt) {
         '<p class="memorize-note">タップすると、①に書いた解答と課題、「ルーブリックで採点して」という依頼文をまとめてコピーし、NotebookLMを開きます。チャット欄に貼り付けて送信するだけでOKです。</p>'
       : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。①の解答と課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
 
-    '<p class="practice-step-label">③ フィードバックを見て、一番弱かった項目を選ぶ</p>' +
+    '<p class="practice-step-label">③ NotebookLMが付けた点数を入力する</p>' +
     '<p class="quiz-instruction reading-instruction" id="axisInstruction">' +
-    (hasUrl ? '先に②のボタンでAIコーチに相談してください' : 'NotebookLMからのフィードバックで、一番弱かった項目はどれですか?') +
+    (hasUrl ? '先に②のボタンでAIコーチに相談してください' : 'NotebookLMからのフィードバックで、各項目が何点だったか入力してください(0〜4点)') +
     '</p>' +
-    '<div id="axisChoices" class="choice-list"></div>' +
+    '<div id="axisScoreForm" class="axis-score-form"></div>' +
+    '<button id="submitPracticeBtn" class="btn-primary" disabled>記録する</button>' +
     '<p id="practiceFeedback" class="feedback-text"></p>';
 
-  const axisEl = document.getElementById('axisChoices');
+  const axisScores = {}; // { 軸名: 選択された点数 }
+  const formEl = document.getElementById('axisScoreForm');
   prompt.axes.forEach(function (axis) {
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.textContent = axis;
-    btn.disabled = hasUrl; // ②のボタンを押すまでは選べないようにする(順番を明確にするため)
-    btn.addEventListener('click', function () { onSubmitPractice(axis, btn); });
-    axisEl.appendChild(btn);
+    const row = document.createElement('div');
+    row.className = 'axis-score-row';
+    const label = document.createElement('div');
+    label.className = 'axis-score-label';
+    label.textContent = axis;
+    row.appendChild(label);
+
+    const chipGroup = document.createElement('div');
+    chipGroup.className = 'axis-score-chips';
+    [0, 1, 2, 3, 4].forEach(function (n) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'score-chip';
+      chip.textContent = String(n);
+      chip.disabled = hasUrl; // ②のボタンを押すまでは選べないようにする(順番を明確にするため)
+      chip.addEventListener('click', function () {
+        axisScores[axis] = n;
+        chipGroup.querySelectorAll('.score-chip').forEach(function (c) { c.classList.remove('selected'); });
+        chip.classList.add('selected');
+        updateSubmitPracticeBtn_(prompt.axes, axisScores);
+      });
+      chipGroup.appendChild(chip);
+    });
+    row.appendChild(chipGroup);
+    formEl.appendChild(row);
+  });
+
+  document.getElementById('submitPracticeBtn').addEventListener('click', function () {
+    onSubmitPractice(axisScores);
   });
 
   if (hasUrl) {
@@ -636,9 +661,9 @@ function renderPracticeCard(prompt) {
       }
       copyToClipboard_(message);
       window.open(prompt.notebooklmUrl, '_blank');
-      // AIコーチに相談したら、弱点の自己申告ボタンを押せるようにする
-      document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });
-      document.getElementById('axisInstruction').textContent = 'NotebookLMからのフィードバックで、一番弱かった項目はどれですか?';
+      // AIコーチに相談したら、点数入力欄を使えるようにする
+      document.querySelectorAll('#axisScoreForm .score-chip').forEach(function (b) { b.disabled = false; });
+      document.getElementById('axisInstruction').textContent = 'NotebookLMからのフィードバックで、各項目が何点だったか入力してください(0〜4点)';
     });
   }
 
@@ -653,25 +678,33 @@ function copyToClipboard_(text) {
   } catch (e) { /* ignore */ }
 }
 
-function onSubmitPractice(axis, btnEl) {
+// 全軸に点数が入力されるまで「記録する」ボタンを押せないようにする
+function updateSubmitPracticeBtn_(axes, axisScores) {
+  const allFilled = axes.every(function (axis) { return axisScores[axis] !== undefined; });
+  document.getElementById('submitPracticeBtn').disabled = !allFilled;
+}
+
+function onSubmitPractice(axisScores) {
   const prompt = state.currentPractice;
   const elapsedSec = Math.round((Date.now() - (state.practiceStartTime || Date.now())) / 1000);
+  const btnEl = document.getElementById('submitPracticeBtn');
 
-  document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = true; });
-  btnEl.classList.add('pending', 'selected');
+  document.querySelectorAll('.score-chip').forEach(function (b) { b.disabled = true; });
+  btnEl.disabled = true;
+  btnEl.textContent = '記録中...';
 
   callApi('submitPracticeAnswer', {
     token: state.token,
     skill: prompt.skill,
     promptId: prompt.promptId,
-    weakAxis: axis,
+    axisScores: JSON.stringify(axisScores),
     elapsedSec: elapsedSec
   }).then(function (res) {
-    btnEl.classList.remove('pending');
     const feedbackEl = document.getElementById('practiceFeedback');
     if (res.ok) {
-      btnEl.classList.add('correct');
-      feedbackEl.textContent = '記録しました。お疲れさまでした！';
+      btnEl.textContent = '記録しました';
+      feedbackEl.textContent = '記録しました。お疲れさまでした！' +
+        (res.weakAxis ? ('(今回の弱点: ' + res.weakAxis + ')') : '');
       feedbackEl.classList.add('correct');
     } else {
       feedbackEl.textContent = 'エラーが発生しました';
@@ -680,10 +713,11 @@ function onSubmitPractice(axis, btnEl) {
     setTimeout(function () {
       showScreen('screen-home');
       loadStats();
-    }, 1600);
+    }, 1800);
   }).catch(function () {
-    btnEl.classList.remove('pending', 'selected');
-    document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });
+    document.querySelectorAll('.score-chip').forEach(function (b) { b.disabled = false; });
+    btnEl.disabled = false;
+    btnEl.textContent = '記録する';
     const feedbackEl = document.getElementById('practiceFeedback');
     feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
     feedbackEl.classList.add('incorrect');

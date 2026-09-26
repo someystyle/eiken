@@ -224,6 +224,29 @@ input[type="text"] {
 }
 #axisChoices .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.axis-score-form { margin-bottom: 16px; }
+.axis-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.axis-score-row:last-child { border-bottom: none; }
+.axis-score-label { font-size: 14px; font-weight: 600; }
+.axis-score-chips { display: flex; gap: 6px; }
+.score-chip {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.score-chip.selected { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
+.score-chip:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .answer-textarea {
   width: 100%;
   box-sizing: border-box;

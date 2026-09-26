@@ -216,6 +216,8 @@ function renderQuestion() {
     renderMemorizeCard(q);
   } else if (q.type === 'reading') {
     renderReadingCard(q);
+  } else if (q.type === 'listening') {
+    renderListeningCard(q);
   } else {
     renderQuizCard(q);
   }
@@ -352,6 +354,110 @@ function onChooseReading(selectedIndex, btnEl) {
         if (correctBtn) correctBtn.classList.add('correct');
       }
       delayMs = 2600;
+    }
+    setTimeout(nextQuestion, delayMs);
+  }).catch(function () {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('quizFeedback');
+    feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
+    feedbackEl.classList.add('incorrect');
+    document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = false; });
+    btnEl.classList.remove('selected');
+  });
+}
+
+// ---- Listening過去問カード (4-2節・6-3節) ----
+// 音声ファイルは使わず、端末のTTS(読み上げ機能)で原稿を読み上げる(3-2節の無料運用方針)。
+// 実際の英検と同様、選択肢は文字で読めるが原稿本文は再生ボタンを押すまで隠しておく。
+function ttsCleanScript_(script) {
+  // 台本中の話者記号(★☆☆☆)はTTSでは不要なので取り除く
+  return String(script || '').replace(/☆☆|★|☆/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function speakText_(text) {
+  try {
+    if (!window.speechSynthesis) return false;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function renderListeningCard(q) {
+  const card = document.getElementById('quizCard');
+  const partLabel = q.sectionType ? ('Listening ' + q.sectionType) : 'Listening';
+
+  card.innerHTML =
+    '<p class="reading-label">' + escapeHtml_(partLabel) + '</p>' +
+    '<button id="listeningPlayBtn" class="btn-primary listening-play-btn">🔊 音声を再生</button>' +
+    '<p class="quiz-instruction reading-instruction">' + escapeHtml_(q.questionText || '内容に最も合うものを選んでください') + '</p>' +
+    '<div id="quizChoices" class="choice-list"></div>' +
+    '<p id="quizFeedback" class="feedback-text"></p>' +
+    '<div id="listeningScript" class="reading-passage listening-script" style="display:none;"></div>';
+
+  document.getElementById('listeningPlayBtn').addEventListener('click', function () {
+    const ok = speakText_(ttsCleanScript_(q.script));
+    if (!ok) {
+      document.getElementById('listeningPlayBtn').textContent = 'この端末では読み上げに対応していません';
+    }
+  });
+
+  const choicesEl = document.getElementById('quizChoices');
+  q.choices.forEach(function (choice, idx) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = choice;
+    btn.addEventListener('click', function () { onChooseListening(idx + 1, btn); });
+    choicesEl.appendChild(btn);
+  });
+
+  // 出題中は自動で1回再生しておく(再生ボタンの押し忘れ対策)
+  speakText_(ttsCleanScript_(q.script));
+}
+
+function onChooseListening(selectedIndex, btnEl) {
+  const q = state.questions[state.currentIndex];
+  const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
+
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = true; });
+  btnEl.classList.add('pending', 'selected');
+
+  callApi('submitListeningAnswer', {
+    token: state.token,
+    questionId: q.questionId,
+    selected: selectedIndex,
+    elapsedSec: elapsedSec
+  }).then(function (res) {
+    btnEl.classList.remove('pending');
+    const feedbackEl = document.getElementById('quizFeedback');
+    let delayMs = 1800;
+    if (res.ok && res.correct) {
+      state.correctCount++;
+      btnEl.classList.add('correct');
+      feedbackEl.textContent = '正解！';
+      feedbackEl.classList.add('correct');
+    } else {
+      btnEl.classList.add('incorrect');
+      feedbackEl.textContent = res.ok ? '不正解…' : 'エラーが発生しました';
+      feedbackEl.classList.add('incorrect');
+      if (res.ok) {
+        const choiceButtons = document.querySelectorAll('.choice-btn');
+        const correctBtn = choiceButtons[res.correctIndex - 1];
+        if (correctBtn) correctBtn.classList.add('correct');
+      }
+      delayMs = 3200;
+    }
+    // 復習用に原稿(スクリプト)を表示する
+    const scriptEl = document.getElementById('listeningScript');
+    if (scriptEl) {
+      scriptEl.textContent = q.script;
+      scriptEl.style.display = '';
     }
     setTimeout(nextQuestion, delayMs);
   }).catch(function () {

@@ -197,6 +197,8 @@ input[type="text"] {
   margin-bottom: 16px;
 }
 .reading-instruction { text-align: left; margin-bottom: 16px; font-weight: 600; color: var(--text); }
+.listening-play-btn { margin-bottom: 20px; }
+.listening-script { margin-top: 16px; font-style: italic; }
 .reading-blank {
   background: #ffe9a8;
   color: inherit;

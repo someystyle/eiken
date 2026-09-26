@@ -594,13 +594,33 @@ function renderPracticeCard(prompt) {
 
   card.innerHTML =
     '<p class="reading-label">' + escapeHtml_(prompt.skill + '・' + prompt.promptType) + '</p>' +
+
+    '<p class="practice-step-label">① 課題に取り組む</p>' +
     '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
+    '<p class="memorize-note">紙やノートに実際に英文を書いて(または声に出して)、答えを作ってみましょう。</p>' +
+
+    '<p class="practice-step-label">② AIコーチに相談する</p>' +
     (hasUrl
-      ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>'
+      ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>' +
+        '<p class="memorize-note">タップすると課題文をコピーしつつNotebookLMが開きます。①で作った自分の答えも一緒にNotebookLMのチャット欄に貼り付けて送信し、評価してもらってください。</p>'
       : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
-    '<p class="quiz-instruction reading-instruction">AIコーチ(NotebookLM)からのフィードバックで、一番弱かった項目はどれですか?</p>' +
+
+    '<p class="practice-step-label">③ フィードバックを見て、一番弱かった項目を選ぶ</p>' +
+    '<p class="quiz-instruction reading-instruction" id="axisInstruction">' +
+    (hasUrl ? '先に②のボタンでAIコーチに相談してください' : 'NotebookLMからのフィードバックで、一番弱かった項目はどれですか?') +
+    '</p>' +
     '<div id="axisChoices" class="choice-list"></div>' +
     '<p id="practiceFeedback" class="feedback-text"></p>';
+
+  const axisEl = document.getElementById('axisChoices');
+  prompt.axes.forEach(function (axis) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = axis;
+    btn.disabled = hasUrl; // ②のボタンを押すまでは選べないようにする(順番を明確にするため)
+    btn.addEventListener('click', function () { onSubmitPractice(axis, btn); });
+    axisEl.appendChild(btn);
+  });
 
   if (hasUrl) {
     document.getElementById('notebookBtn').addEventListener('click', function () {
@@ -608,17 +628,11 @@ function renderPracticeCard(prompt) {
       // 本人はチャット欄に貼り付けて送信するだけでよい。
       copyToClipboard_(prompt.task);
       window.open(prompt.notebooklmUrl, '_blank');
+      // AIコーチに相談したら、弱点の自己申告ボタンを押せるようにする
+      document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });
+      document.getElementById('axisInstruction').textContent = 'NotebookLMからのフィードバックで、一番弱かった項目はどれですか?';
     });
   }
-
-  const axisEl = document.getElementById('axisChoices');
-  prompt.axes.forEach(function (axis) {
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.textContent = axis;
-    btn.addEventListener('click', function () { onSubmitPractice(axis, btn); });
-    axisEl.appendChild(btn);
-  });
 
   state.practiceStartTime = Date.now();
 }

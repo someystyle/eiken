@@ -203,6 +203,16 @@ input[type="text"] {
 
 .practice-btn { margin-bottom: 10px; }
 .practice-btn:last-child { margin-bottom: 0; }
+
+.practice-step-label {
+  text-align: left;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--primary-dark);
+  margin: 20px 0 8px;
+}
+.practice-step-label:first-of-type { margin-top: 4px; }
+#axisChoices .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .reading-blank {
   background: #ffe9a8;
   color: inherit;

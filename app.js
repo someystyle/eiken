@@ -57,6 +57,7 @@ window.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('logoutBtn').addEventListener('click', function () {
+    stopSpeech_();
     safeRemoveLocalStorage(LS_TOKEN_KEY);
     state.token = null;
     state.user = null;
@@ -72,14 +73,22 @@ window.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('startBtn').addEventListener('click', startSession);
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
+    stopSpeech_(); // Listening再生中に中断した場合、音声を止め忘れないように
     showScreen('screen-home');
     loadStats();
   });
   document.getElementById('backHomeBtn').addEventListener('click', function () {
+    stopSpeech_();
     showScreen('screen-home');
     loadStats();
   });
 });
+
+function stopSpeech_() {
+  try {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  } catch (e) { /* ignore */ }
+}
 
 function safeGetLocalStorage(key) {
   try { return localStorage.getItem(key); } catch (e) { return null; }

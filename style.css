@@ -223,6 +223,18 @@ input[type="text"] {
   margin: 0 0 10px;
 }
 #axisChoices .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.answer-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  resize: vertical;
+  margin-bottom: 16px;
+}
 .reading-blank {
   background: #ffe9a8;
   color: inherit;

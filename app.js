@@ -598,13 +598,13 @@ function renderPracticeCard(prompt) {
     '<p class="practice-step-label">① 課題に取り組む</p>' +
     '<p class="practice-instruction">' + escapeHtml_(prompt.instruction || '課題に取り組んでください。') + '</p>' +
     '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
-    '<p class="memorize-note">紙やノートに実際に英文を書いて(または声に出して)、答えを作ってみましょう。</p>' +
+    '<textarea id="answerInput" class="answer-textarea" placeholder="ここに解答を書いてください(Speakingの場合は話した内容を書き起こしてください)" rows="6"></textarea>' +
 
     '<p class="practice-step-label">② AIコーチに相談する</p>' +
     (hasUrl
       ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>' +
-        '<p class="memorize-note">タップすると、採点を依頼する文章(課題+ルーブリックで採点してという指示+解答を書く欄)がコピーされ、NotebookLMが開きます。NotebookLMのチャット欄に貼り付けたら、「(ここに自分の解答を貼り付けてください)」の部分を①で作った自分の解答に書き換えてから送信してください。</p>'
-      : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
+        '<p class="memorize-note">タップすると、①に書いた解答と課題、「ルーブリックで採点して」という依頼文をまとめてコピーし、NotebookLMを開きます。チャット欄に貼り付けて送信するだけでOKです。</p>'
+      : '<p class="memorize-note">NotebookLM URLが未設定です(usersシートのnotebooklm_url列に登録してください)。①の解答と課題文を自分でコピーして、いつも使っているNotebookLMに貼り付けてください。</p>') +
 
     '<p class="practice-step-label">③ フィードバックを見て、一番弱かった項目を選ぶ</p>' +
     '<p class="quiz-instruction reading-instruction" id="axisInstruction">' +
@@ -626,9 +626,15 @@ function renderPracticeCard(prompt) {
   if (hasUrl) {
     document.getElementById('notebookBtn').addEventListener('click', function () {
       // 10-3節・8-5節: タップ削減のため、「ルーブリックで採点して」という依頼文+課題+
-      // 解答を書く欄をセットにした文章をクリップボードにコピーしつつNotebookLMを開く。
-      // 本人は解答欄を書き換えてチャット欄に貼り付け、送信するだけでよい。
-      copyToClipboard_(prompt.notebooklmMessage || prompt.task);
+      // ①でアプリ内に書いた解答をセットにした文章をクリップボードにコピーしつつNotebookLMを開く。
+      // 本人はチャット欄に貼り付けて送信するだけでよい。
+      const answerText = (document.getElementById('answerInput').value || '').trim();
+      const placeholder = /\(ここに自分の解答をそのまま貼り付けてください\)|\(実際に声に出して答えた内容を、思い出しながらここに書いてください\)/;
+      let message = prompt.notebooklmMessage || prompt.task;
+      if (answerText) {
+        message = message.replace(placeholder, answerText);
+      }
+      copyToClipboard_(message);
       window.open(prompt.notebooklmUrl, '_blank');
       // AIコーチに相談したら、弱点の自己申告ボタンを押せるようにする
       document.querySelectorAll('#axisChoices .choice-btn').forEach(function (b) { b.disabled = false; });

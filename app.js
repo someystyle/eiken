@@ -20,7 +20,9 @@ const state = {
   currentPractice: null, // Writing/Speaking練習中の課題データ
   practiceStartTime: null,
   examResult: null, // 受験結果フォームで選択中の合格/不合格
-  currentTargetExamDate: null // 現在登録されている目標試験日(結果記録フォームの表示判定に使う)
+  currentTargetExamDate: null, // 現在登録されている目標試験日(結果記録フォームの表示判定に使う)
+  isMockExam: false, // 5-3節: 月次模試を受験中かどうか
+  mockTally: null // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
 };
 
 // ---- 画面切替 ----
@@ -78,6 +80,7 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('startBtn').addEventListener('click', startSession);
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
     stopSpeech_(); // Listening再生中に中断した場合、音声を止め忘れないように
+    state.isMockExam = false; // 模試を中断した場合、結果は記録せず状態だけリセットする
     showScreen('screen-home');
     loadStats();
   });
@@ -88,6 +91,7 @@ window.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('aiCoachBtn').addEventListener('click', onAiCoachClick_);
+  document.getElementById('startMockExamBtn').addEventListener('click', startMockExam);
 
   document.getElementById('writingPracticeBtn').addEventListener('click', function () { startPractice('Writing'); });
   document.getElementById('speakingPracticeBtn').addEventListener('click', function () { startPractice('Speaking'); });
@@ -448,6 +452,61 @@ function renderSkillScores(skillScores) {
 }
 
 // ---- セッション開始 (6-1節) ----
+// ---- 月次模試 (5-3節) ----
+function startMockExam() {
+  showScreen('screen-quiz');
+  document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題中...(61問あります)</p>';
+  callApi('startMockExam', { token: state.token }).then(function (res) {
+    if (!res.ok || !res.questions || res.questions.length === 0) {
+      document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題できる問題がありません</p>';
+      return;
+    }
+    state.questions = res.questions;
+    state.currentIndex = 0;
+    state.correctCount = 0;
+    state.isMockExam = true;
+    state.mockTally = {
+      Vocabulary: { correct: 0, total: 0 },
+      Reading: { correct: 0, total: 0 },
+      Listening: { correct: 0, total: 0 }
+    };
+    renderQuestion();
+  });
+}
+
+function tallyMock_(skill, correct) {
+  if (!state.mockTally || !state.mockTally[skill]) return;
+  state.mockTally[skill].total++;
+  if (correct) state.mockTally[skill].correct++;
+}
+
+function finishMockExam() {
+  const tally = state.mockTally;
+  const params = { token: state.token };
+  ['Vocabulary', 'Reading', 'Listening'].forEach(function (skill) {
+    params[skill + 'Correct'] = tally[skill].correct;
+    params[skill + 'Total'] = tally[skill].total;
+  });
+
+  showScreen('screen-result');
+  document.getElementById('resultBody').innerHTML = '<p class="memorize-note">結果を記録しています...</p>';
+
+  callApi('submitMockExamResult', params).then(function (res) {
+    state.isMockExam = false;
+    const body = document.getElementById('resultBody');
+    if (!res.ok) { body.innerHTML = '<p class="memorize-note">記録に失敗しました。</p>'; return; }
+    body.innerHTML = ['Vocabulary', 'Reading', 'Listening'].map(function (skill) {
+      const label = SKILL_LABELS[skill] || skill;
+      const pct = res.result[skill];
+      return statItem(pct === null ? '-' : pct + '%', label);
+    }).join('') +
+      '<p class="memorize-note">この結果をもとに、各技能の実力スコアの精度を補正しました(5-3節)。</p>';
+  }).catch(function () {
+    state.isMockExam = false;
+    document.getElementById('resultBody').innerHTML = '<p class="memorize-note">通信に失敗しました。</p>';
+  });
+}
+
 function startSession() {
   showScreen('screen-quiz');
   document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題中...</p>';
@@ -635,6 +694,7 @@ function onChooseReading(choice, btnEl) {
       }
       delayMs = 2600;
     }
+    if (state.isMockExam) tallyMock_('Reading', !!(res.ok && res.correct));
     setTimeout(nextQuestion, delayMs);
   }).catch(function () {
     btnEl.classList.remove('pending');
@@ -755,6 +815,7 @@ function onChooseListening(choice, btnEl) {
       scriptEl.textContent = q.script;
       scriptEl.style.display = '';
     }
+    if (state.isMockExam) tallyMock_('Listening', !!(res.ok && res.correct));
     setTimeout(nextQuestion, delayMs);
   }).catch(function () {
     btnEl.classList.remove('pending');
@@ -801,6 +862,7 @@ function onChoose(choice, btnEl) {
       });
       delayMs = 2600; // 不正解時は正解を確認する時間をさらに長くする
     }
+    if (state.isMockExam) tallyMock_('Vocabulary', !!(res.ok && res.correct));
     setTimeout(nextQuestion, delayMs);
   }).catch(function () {
     btnEl.classList.remove('pending');
@@ -815,6 +877,7 @@ function onChoose(choice, btnEl) {
 function nextQuestion() {
   state.currentIndex++;
   if (state.currentIndex >= state.questions.length) {
+    if (state.isMockExam) { finishMockExam(); return; }
     showResult();
     return;
   }

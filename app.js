@@ -76,6 +76,10 @@ window.addEventListener('DOMContentLoaded', function () {
   setupChipGroup('minutesChips', function (val) { state.minutes = val; updateStartBtn(); });
   setupChipGroup('conditionChips', function (val) { state.condition = val; updateStartBtn(); });
   setupChipGroup('debugModeChips', function (val) { state.debugMode = val; });
+  setupChipGroup('statsViewChips', function (val) {
+    document.getElementById('statsBody').style.display = (val === 'numbers') ? '' : 'none';
+    document.getElementById('statsGraphBody').style.display = (val === 'graph') ? '' : 'none';
+  });
 
   document.getElementById('startBtn').addEventListener('click', startSession);
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
@@ -219,9 +223,93 @@ function loadStats() {
   });
   loadPausePeriods();
   loadExamInfo();
+  loadProgressGraphs();
 }
 
-// ---- 休止期間 (12章) ----
+// ---- 進捗グラフ(モチベーション向上のため、数字とグラフを切り替えて見られるようにする) ----
+function loadProgressGraphs() {
+  const graphBody = document.getElementById('statsGraphBody');
+  callApi('getProgressHistory', { token: state.token }).then(function (res) {
+    if (!res.ok) { graphBody.innerHTML = '<p class="memorize-note">グラフの取得に失敗しました。</p>'; return; }
+    graphBody.innerHTML = renderProgressGraphs(res);
+  }).catch(function () {
+    graphBody.innerHTML = '<p class="memorize-note">グラフの取得に失敗しました。</p>';
+  });
+}
+
+function renderProgressGraphs(data) {
+  const cumulative = data.cumulativeQuestions || [];
+  const weekly = data.weeklyAccuracy || [];
+
+  let html = '<p class="section-label">これまでに取り組んだ問題数(累計)</p>';
+  if (cumulative.length < 2) {
+    html += '<p class="memorize-note">もう少し学習を続けると、ここにグラフが表示されます。</p>';
+  } else {
+    html += buildLineChartSvg_(cumulative.map(function (d) { return d.total; }), {
+      color: '#2d6a4f', fillColor: 'rgba(45,106,79,0.15)',
+      firstLabel: cumulative[0].date, lastLabel: cumulative[cumulative.length - 1].date
+    });
+    html += '<p class="graph-caption">' + cumulative[cumulative.length - 1].total + '問(累計)まで積み上がりました！</p>';
+  }
+
+  html += '<p class="section-label" style="margin-top:20px;">週ごとの正答率(定着率)の推移</p>';
+  if (weekly.length < 2) {
+    html += '<p class="memorize-note">もう少し学習を続けると、ここにグラフが表示されます。</p>';
+  } else {
+    html += buildBarChartSvg_(weekly.map(function (w) { return w.accuracy; }), {
+      color: '#2d6a4f',
+      firstLabel: weekly[0].weekStart + '週', lastLabel: weekly[weekly.length - 1].weekStart + '週',
+      maxValue: 100, unit: '%'
+    });
+  }
+
+  return html;
+}
+
+// シンプルな折れ線グラフ(SVG)。累計は右肩上がりになるので、伸びている実感を持たせる用途。
+function buildLineChartSvg_(values, opts) {
+  const w = 300, h = 90, pad = 6;
+  const max = Math.max.apply(null, values);
+  const min = Math.min.apply(null, values);
+  const range = (max - min) || 1;
+  const stepX = (w - pad * 2) / (values.length - 1);
+
+  const points = values.map(function (v, i) {
+    const x = pad + i * stepX;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const areaPoints = points + ' ' + (pad + (values.length - 1) * stepX).toFixed(1) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="progress-chart" preserveAspectRatio="none">' +
+    '<polygon points="' + areaPoints + '" fill="' + opts.fillColor + '" stroke="none"></polygon>' +
+    '<polyline points="' + points + '" fill="none" stroke="' + opts.color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>' +
+    '</svg>' +
+    '<div class="graph-x-labels"><span>' + opts.firstLabel + '</span><span>' + opts.lastLabel + '</span></div>';
+}
+
+// シンプルな棒グラフ(SVG)。正答率の推移用。
+function buildBarChartSvg_(values, opts) {
+  const w = 300, h = 90, pad = 4;
+  const max = opts.maxValue || Math.max.apply(null, values);
+  const barGap = 4;
+  const barWidth = (w - pad * 2) / values.length - barGap;
+
+  const bars = values.map(function (v, i) {
+    const barH = Math.max(2, (v / max) * (h - pad * 2));
+    const x = pad + i * ((w - pad * 2) / values.length);
+    const y = h - pad - barH;
+    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barWidth.toFixed(1) +
+      '" height="' + barH.toFixed(1) + '" fill="' + opts.color + '" rx="2"></rect>' +
+      '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (y - 3).toFixed(1) +
+      '" font-size="8" text-anchor="middle" fill="#556">' + v + (opts.unit || '') + '</text>';
+  }).join('');
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="progress-chart" preserveAspectRatio="none">' + bars + '</svg>' +
+    '<div class="graph-x-labels"><span>' + opts.firstLabel + '</span><span>' + opts.lastLabel + '</span></div>';
+}
+
+// ---- 休止期間 ----
 function loadPausePeriods() {
   const listEl = document.getElementById('pauseList');
   listEl.textContent = '読み込み中...';
@@ -500,7 +588,7 @@ function finishMockExam() {
       const pct = res.result[skill];
       return statItem(pct === null ? '-' : pct + '%', label);
     }).join('') +
-      '<p class="memorize-note">この結果をもとに、各技能の実力スコアの精度を補正しました(5-3節)。</p>';
+      '<p class="memorize-note">この結果をもとに、各技能の実力スコアの精度を補正しました。</p>';
   }).catch(function () {
     state.isMockExam = false;
     document.getElementById('resultBody').innerHTML = '<p class="memorize-note">通信に失敗しました。</p>';

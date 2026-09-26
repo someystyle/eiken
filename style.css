@@ -378,3 +378,21 @@ input[type="text"] {
   margin-bottom: 16px;
   text-align: center;
 }
+
+/* 進捗グラフ(モチベーション向上のため、数字とグラフを切り替えて見られるようにする) */
+.stats-graph-body { margin-top: 8px; }
+.progress-chart { width: 100%; height: 90px; display: block; }
+.graph-x-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.graph-caption {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 6px 0 0;
+}

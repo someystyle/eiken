@@ -289,3 +289,39 @@ input[type="text"] {
 .feedback-text { min-height: 20px; margin-top: 16px; font-weight: 600; }
 .feedback-text.correct { color: var(--success); }
 .feedback-text.incorrect { color: var(--danger); }
+
+/* 休止期間(12章) */
+.pause-list { margin-bottom: 8px; }
+.pause-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.pause-item:last-child { border-bottom: none; }
+.pause-item-dates { font-weight: 600; }
+.pause-item-reason { color: var(--muted); }
+.pause-toggle-btn { padding-left: 0; }
+.pause-form input[type="text"],
+.pause-form input[type="date"] {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 4px;
+  box-sizing: border-box;
+}
+
+/* リハビリモード(休止明けの軽めメニュー通知) */
+.rehab-banner {
+  background: #e3f0e9;
+  color: var(--primary-dark);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}

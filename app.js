@@ -91,6 +91,12 @@ window.addEventListener('DOMContentLoaded', function () {
     showScreen('screen-home');
     loadStats();
   });
+
+  document.getElementById('togglePauseFormBtn').addEventListener('click', function () {
+    const form = document.getElementById('pauseForm');
+    form.style.display = (form.style.display === 'none') ? '' : 'none';
+  });
+  document.getElementById('submitPauseBtn').addEventListener('click', submitPausePeriod);
 });
 
 function stopSpeech_() {
@@ -161,6 +167,59 @@ function loadStats() {
     body.textContent = '通信に失敗しました。';
     skillBody.textContent = '通信に失敗しました。';
   });
+  loadPausePeriods();
+}
+
+// ---- 休止期間 (12章) ----
+function loadPausePeriods() {
+  const listEl = document.getElementById('pauseList');
+  listEl.textContent = '読み込み中...';
+  callApi('getPausePeriods', { token: state.token }).then(function (res) {
+    if (!res.ok) { listEl.textContent = '取得に失敗しました。'; return; }
+    const periods = res.pausePeriods || [];
+    if (periods.length === 0) {
+      listEl.innerHTML = '<p class="memorize-note">登録されている休止期間はありません。</p>';
+      return;
+    }
+    listEl.innerHTML = periods.map(function (p) {
+      return '<div class="pause-item">' +
+        '<span class="pause-item-dates">' + p.startDate + ' 〜 ' + p.endDate + '</span>' +
+        (p.reason ? '<span class="pause-item-reason">' + escapeHtml_(p.reason) + '</span>' : '') +
+        '</div>';
+    }).join('');
+  }).catch(function () { listEl.textContent = '通信に失敗しました。'; });
+}
+
+function submitPausePeriod() {
+  const startDate = document.getElementById('pauseStartInput').value;
+  const endDate = document.getElementById('pauseEndInput').value;
+  const reason = document.getElementById('pauseReasonInput').value;
+  const errEl = document.getElementById('pauseError');
+  errEl.textContent = '';
+
+  if (!startDate || !endDate) {
+    errEl.textContent = '開始日と終了日を入力してください。';
+    return;
+  }
+  if (endDate < startDate) {
+    errEl.textContent = '終了日は開始日より後にしてください。';
+    return;
+  }
+
+  const btn = document.getElementById('submitPauseBtn');
+  btn.disabled = true;
+  callApi('registerPause', { token: state.token, startDate: startDate, endDate: endDate, reason: reason }).then(function (res) {
+    btn.disabled = false;
+    if (!res.ok) { errEl.textContent = '登録に失敗しました。'; return; }
+    document.getElementById('pauseStartInput').value = '';
+    document.getElementById('pauseEndInput').value = '';
+    document.getElementById('pauseReasonInput').value = '';
+    document.getElementById('pauseForm').style.display = 'none';
+    loadPausePeriods();
+  }).catch(function () {
+    btn.disabled = false;
+    errEl.textContent = '通信に失敗しました。';
+  });
 }
 
 function renderStatsGrid(stats) {
@@ -217,13 +276,26 @@ function startSession() {
     params.mode = state.debugMode;
   }
   callApi('getQuiz', params).then(function (res) {
-    if (!res.ok || !res.questions || res.questions.length === 0) {
+    if (!res.ok) {
+      document.getElementById('quizCard').innerHTML = '<p class="quiz-word">取得に失敗しました</p>';
+      return;
+    }
+    // 12章: 休止期間中はセッション自体が発生しない
+    if (res.paused) {
+      document.getElementById('quizCard').innerHTML =
+        '<p class="reading-label">休止期間中</p>' +
+        '<p class="quiz-word" style="font-size:20px;">現在、休止期間として登録されている期間です。</p>' +
+        '<p class="memorize-note">ゆっくり休んでください。休止期間が終わると自動的に元通り学習を再開できます。</p>';
+      return;
+    }
+    if (!res.questions || res.questions.length === 0) {
       document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題できる問題がありません</p>';
       return;
     }
     state.questions = res.questions;
     state.currentIndex = 0;
     state.correctCount = 0;
+    state.rehabMode = !!res.rehabMode;
     renderQuestion();
   });
 }
@@ -239,6 +311,14 @@ function renderQuestion() {
     renderListeningCard(q);
   } else {
     renderQuizCard(q);
+  }
+  // 12-3節: 休止明け直後のリハビリモードであることを、最初の問題でだけ知らせる
+  if (state.rehabMode && state.currentIndex === 0) {
+    const card = document.getElementById('quizCard');
+    const banner = document.createElement('p');
+    banner.className = 'rehab-banner';
+    banner.textContent = '休み明けなので、今日は復習だけの軽めメニューです。';
+    card.insertBefore(banner, card.firstChild);
   }
   state.questionStartTime = Date.now();
 }

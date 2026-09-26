@@ -81,6 +81,23 @@
       <p class="section-label">合格ラインに向けた進み具合(下がることはありません)</p>
       <div id="skillScoreBody">読み込み中...</div>
     </div>
+
+    <div class="card">
+      <h2>休止期間(12章)</h2>
+      <p class="section-label">定期テスト・部活合宿など、学習をお休みする期間を登録できます</p>
+      <div id="pauseList" class="pause-list"></div>
+      <button id="togglePauseFormBtn" class="btn-link pause-toggle-btn">＋ 休止期間を登録する</button>
+      <div id="pauseForm" class="pause-form" style="display:none;">
+        <p class="section-label">開始日</p>
+        <input type="date" id="pauseStartInput">
+        <p class="section-label">終了日</p>
+        <input type="date" id="pauseEndInput">
+        <p class="section-label">理由(任意)</p>
+        <input type="text" id="pauseReasonInput" placeholder="例: 定期テスト、部活合宿">
+        <button id="submitPauseBtn" class="btn-primary">登録する</button>
+        <p id="pauseError" class="error-text"></p>
+      </div>
+    </div>
   </section>
 
   <!-- クイズ画面 -->

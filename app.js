@@ -228,16 +228,30 @@ function loadStats() {
 }
 
 // ---- 5技能バランスのレーダーチャート(何が不得意か一目で分かる用途) ----
+// 軸ラベルは長い正式名称(リーディング等)だとSVGのviewBox外にはみ出て欠けてしまうため、
+// 短縮表記を使い、text-anchorも常にmiddleに統一して幅を左右対称に抑える。
+const SKILL_SHORT_LABELS = {
+  Vocabulary: '語彙',
+  Reading: '読解',
+  Listening: '聴解',
+  Writing: '英作文',
+  Speaking: '面接'
+};
+
 function renderSkillRadarChart_(skillScores) {
   const order = ['Vocabulary', 'Reading', 'Listening', 'Writing', 'Speaking'];
   const byName = {};
   skillScores.forEach(function (s) { byName[s.skill] = s; });
   const points = order.map(function (name) {
     const s = byName[name];
-    return { label: SKILL_LABELS[name] || name, value: s ? Math.max(0, Math.min(100, s.displayScore)) : 0 };
+    return {
+      label: SKILL_LABELS[name] || name,
+      shortLabel: SKILL_SHORT_LABELS[name] || name,
+      value: s ? Math.max(0, Math.min(100, s.displayScore)) : 0
+    };
   });
 
-  const size = 260, center = size / 2, maxRadius = 90;
+  const size = 300, center = size / 2, maxRadius = 78;
   const angleStep = (Math.PI * 2) / points.length;
   const axisStart = -Math.PI / 2;
 
@@ -265,17 +279,18 @@ function renderSkillRadarChart_(skillScores) {
   // 実際の値を結ぶ五角形
   const valuePts = points.map(function (p, i) { const c = coordAt(i, p.value / 100); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
 
-  // 軸ラベル(技能名 + 点数)
+  // 軸ラベル(短縮技能名+点数を2行で。常にmiddle揃えなので左右にはみ出さない)
   const labels = points.map(function (p, i) {
-    const c = coordAt(i, 1.22);
-    const anchor = Math.abs(Math.cos(axisStart + angleStep * i)) < 0.3 ? 'middle' : (Math.cos(axisStart + angleStep * i) > 0 ? 'start' : 'end');
-    return '<text x="' + c.x.toFixed(1) + '" y="' + c.y.toFixed(1) + '" font-size="12" text-anchor="' + anchor + '" fill="#334">' +
-      p.label + '(' + p.value + ')</text>';
+    const c = coordAt(i, 1.32);
+    return '<text x="' + c.x.toFixed(1) + '" y="' + c.y.toFixed(1) + '" font-size="12" text-anchor="middle" fill="#334">' +
+      '<tspan x="' + c.x.toFixed(1) + '" dy="0">' + p.shortLabel + '</tspan>' +
+      '<tspan x="' + c.x.toFixed(1) + '" dy="14" font-size="10" fill="#2d6a4f">' + p.value + '点</tspan>' +
+      '</text>';
   }).join('');
 
   const weakest = points.slice().sort(function (a, b) { return a.value - b.value; })[0];
 
-  return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart">' +
+  return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart" style="overflow:visible;">' +
     gridPolygons + axisLines +
     '<polygon points="' + valuePts + '" fill="rgba(45,106,79,0.25)" stroke="#2d6a4f" stroke-width="2" stroke-linejoin="round"></polygon>' +
     labels +

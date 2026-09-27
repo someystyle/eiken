@@ -216,97 +216,71 @@ function loadStats() {
   callApi('getStats', { token: state.token }).then(function (res) {
     if (!res.ok) { body.textContent = '取得に失敗しました。'; skillBody.textContent = '取得に失敗しました。'; return; }
     body.innerHTML = renderStatsGrid(res.stats);
-    skillBody.innerHTML = renderSkillScores(res.stats.skillScores || []);
+    const skillScores = res.stats.skillScores || [];
+    skillBody.innerHTML = renderSkillScores(skillScores);
+    document.getElementById('statsGraphBody').innerHTML = renderSkillRadarChart_(skillScores);
   }).catch(function () {
     body.textContent = '通信に失敗しました。';
     skillBody.textContent = '通信に失敗しました。';
   });
   loadPausePeriods();
   loadExamInfo();
-  loadProgressGraphs();
 }
 
-// ---- 進捗グラフ(モチベーション向上のため、数字とグラフを切り替えて見られるようにする) ----
-function loadProgressGraphs() {
-  const graphBody = document.getElementById('statsGraphBody');
-  callApi('getProgressHistory', { token: state.token }).then(function (res) {
-    if (!res.ok) { graphBody.innerHTML = '<p class="memorize-note">グラフの取得に失敗しました。</p>'; return; }
-    graphBody.innerHTML = renderProgressGraphs(res);
-  }).catch(function () {
-    graphBody.innerHTML = '<p class="memorize-note">グラフの取得に失敗しました。</p>';
+// ---- 5技能バランスのレーダーチャート(何が不得意か一目で分かる用途) ----
+function renderSkillRadarChart_(skillScores) {
+  const order = ['Vocabulary', 'Reading', 'Listening', 'Writing', 'Speaking'];
+  const byName = {};
+  skillScores.forEach(function (s) { byName[s.skill] = s; });
+  const points = order.map(function (name) {
+    const s = byName[name];
+    return { label: SKILL_LABELS[name] || name, value: s ? Math.max(0, Math.min(100, s.displayScore)) : 0 };
   });
-}
 
-function renderProgressGraphs(data) {
-  const cumulative = data.cumulativeQuestions || [];
-  const weekly = data.weeklyAccuracy || [];
+  const size = 260, center = size / 2, maxRadius = 90;
+  const angleStep = (Math.PI * 2) / points.length;
+  const axisStart = -Math.PI / 2;
 
-  let html = '<p class="section-label">これまでに取り組んだ問題数(累計)</p>';
-  if (cumulative.length < 2) {
-    html += '<p class="memorize-note">もう少し学習を続けると、ここにグラフが表示されます。</p>';
-  } else {
-    html += buildLineChartSvg_(cumulative.map(function (d) { return d.total; }), {
-      color: '#2d6a4f', fillColor: 'rgba(45,106,79,0.15)',
-      firstLabel: cumulative[0].date, lastLabel: cumulative[cumulative.length - 1].date
-    });
-    html += '<p class="graph-caption">' + cumulative[cumulative.length - 1].total + '問(累計)まで積み上がりました！</p>';
+  function coordAt(i, ratio) {
+    const angle = axisStart + angleStep * i;
+    return {
+      x: center + Math.cos(angle) * maxRadius * ratio,
+      y: center + Math.sin(angle) * maxRadius * ratio
+    };
   }
 
-  html += '<p class="section-label" style="margin-top:20px;">週ごとの正答率(定着率)の推移</p>';
-  if (weekly.length < 2) {
-    html += '<p class="memorize-note">もう少し学習を続けると、ここにグラフが表示されます。</p>';
-  } else {
-    html += buildBarChartSvg_(weekly.map(function (w) { return w.accuracy; }), {
-      color: '#2d6a4f',
-      firstLabel: weekly[0].weekStart + '週', lastLabel: weekly[weekly.length - 1].weekStart + '週',
-      maxValue: 100, unit: '%'
-    });
-  }
-
-  return html;
-}
-
-// シンプルな折れ線グラフ(SVG)。累計は右肩上がりになるので、伸びている実感を持たせる用途。
-function buildLineChartSvg_(values, opts) {
-  const w = 300, h = 90, pad = 6;
-  const max = Math.max.apply(null, values);
-  const min = Math.min.apply(null, values);
-  const range = (max - min) || 1;
-  const stepX = (w - pad * 2) / (values.length - 1);
-
-  const points = values.map(function (v, i) {
-    const x = pad + i * stepX;
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  const areaPoints = points + ' ' + (pad + (values.length - 1) * stepX).toFixed(1) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
-
-  return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="progress-chart" preserveAspectRatio="none">' +
-    '<polygon points="' + areaPoints + '" fill="' + opts.fillColor + '" stroke="none"></polygon>' +
-    '<polyline points="' + points + '" fill="none" stroke="' + opts.color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>' +
-    '</svg>' +
-    '<div class="graph-x-labels"><span>' + opts.firstLabel + '</span><span>' + opts.lastLabel + '</span></div>';
-}
-
-// シンプルな棒グラフ(SVG)。正答率の推移用。
-function buildBarChartSvg_(values, opts) {
-  const w = 300, h = 90, pad = 4;
-  const max = opts.maxValue || Math.max.apply(null, values);
-  const barGap = 4;
-  const barWidth = (w - pad * 2) / values.length - barGap;
-
-  const bars = values.map(function (v, i) {
-    const barH = Math.max(2, (v / max) * (h - pad * 2));
-    const x = pad + i * ((w - pad * 2) / values.length);
-    const y = h - pad - barH;
-    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barWidth.toFixed(1) +
-      '" height="' + barH.toFixed(1) + '" fill="' + opts.color + '" rx="2"></rect>' +
-      '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (y - 3).toFixed(1) +
-      '" font-size="8" text-anchor="middle" fill="#556">' + v + (opts.unit || '') + '</text>';
+  // 背景のグリッド線(25/50/75/100%の目安の五角形)
+  const gridLevels = [0.25, 0.5, 0.75, 1];
+  const gridPolygons = gridLevels.map(function (ratio) {
+    const pts = points.map(function (_, i) { const c = coordAt(i, ratio); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
+    return '<polygon points="' + pts + '" fill="none" stroke="#dde3dd" stroke-width="1"></polygon>';
   }).join('');
 
-  return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="progress-chart" preserveAspectRatio="none">' + bars + '</svg>' +
-    '<div class="graph-x-labels"><span>' + opts.firstLabel + '</span><span>' + opts.lastLabel + '</span></div>';
+  // 中心から各軸への線
+  const axisLines = points.map(function (_, i) {
+    const c = coordAt(i, 1);
+    return '<line x1="' + center + '" y1="' + center + '" x2="' + c.x.toFixed(1) + '" y2="' + c.y.toFixed(1) + '" stroke="#dde3dd" stroke-width="1"></line>';
+  }).join('');
+
+  // 実際の値を結ぶ五角形
+  const valuePts = points.map(function (p, i) { const c = coordAt(i, p.value / 100); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
+
+  // 軸ラベル(技能名 + 点数)
+  const labels = points.map(function (p, i) {
+    const c = coordAt(i, 1.22);
+    const anchor = Math.abs(Math.cos(axisStart + angleStep * i)) < 0.3 ? 'middle' : (Math.cos(axisStart + angleStep * i) > 0 ? 'start' : 'end');
+    return '<text x="' + c.x.toFixed(1) + '" y="' + c.y.toFixed(1) + '" font-size="12" text-anchor="' + anchor + '" fill="#334">' +
+      p.label + '(' + p.value + ')</text>';
+  }).join('');
+
+  const weakest = points.slice().sort(function (a, b) { return a.value - b.value; })[0];
+
+  return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart">' +
+    gridPolygons + axisLines +
+    '<polygon points="' + valuePts + '" fill="rgba(45,106,79,0.25)" stroke="#2d6a4f" stroke-width="2" stroke-linejoin="round"></polygon>' +
+    labels +
+    '</svg>' +
+    '<p class="graph-caption">今いちばん伸びしろがあるのは「' + weakest.label + '」です</p>';
 }
 
 // ---- 休止期間 ----

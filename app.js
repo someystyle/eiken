@@ -22,7 +22,9 @@ const state = {
   examResult: null, // 受験結果フォームで選択中の合格/不合格
   currentTargetExamDate: null, // 現在登録されている目標試験日(結果記録フォームの表示判定に使う)
   isMockExam: false, // 5-3節: 月次模試を受験中かどうか
-  mockTally: null // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
+  mockTally: null, // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
+  pronunciationWords: [], // 発音再生機能の今回のバッチ(10語)
+  pronunciationIndex: 0
 };
 
 // ---- 画面切替 ----
@@ -100,6 +102,15 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('writingPracticeBtn').addEventListener('click', function () { startPractice('Writing'); });
   document.getElementById('speakingPracticeBtn').addEventListener('click', function () { startPractice('Speaking'); });
   document.getElementById('quitPracticeBtn').addEventListener('click', function () {
+    showScreen('screen-home');
+    loadStats();
+  });
+
+  document.getElementById('pronunciationBtn').addEventListener('click', startPronunciation);
+  document.getElementById('pronunciationRepeatBtn').addEventListener('click', function () { playCurrentPronunciationWord_(); });
+  document.getElementById('pronunciationNextBtn').addEventListener('click', nextPronunciationWord);
+  document.getElementById('quitPronunciationBtn').addEventListener('click', function () {
+    stopSpeech_();
     showScreen('screen-home');
     loadStats();
   });
@@ -509,7 +520,9 @@ const SKILLS_FOR_EXAM = ['Vocabulary', 'Reading', 'Listening', 'Writing', 'Speak
 
 function renderSkillScores(skillScores) {
   return skillScores.map(function (s) {
-    const label = SKILL_LABELS[s.skill] || s.skill;
+    const baseLabel = SKILL_LABELS[s.skill] || s.skill;
+    const shortLabel = SKILL_SHORT_LABELS[s.skill];
+    const label = (shortLabel && s.skill !== 'Vocabulary') ? (baseLabel + '(' + shortLabel + ')') : baseLabel;
     if (!s.implemented) {
       return (
         '<div class="skill-row skill-row-disabled">' +
@@ -519,9 +532,11 @@ function renderSkillScores(skillScores) {
       );
     }
     const pct = Math.max(0, Math.min(100, s.displayScore));
+    // 13章: Reading/Listening/Writingは今挑戦中の級バッジを併記し、立ち位置が一目でわかるようにする
+    const levelBadge = s.level ? '<span class="skill-level-badge">' + s.level + '</span>' : '';
     return (
       '<div class="skill-row">' +
-      '<div class="skill-row-head"><span>' + label + '</span><span>' + pct + '点</span></div>' +
+      '<div class="skill-row-head"><span>' + label + levelBadge + '</span><span>' + pct + '点</span></div>' +
       '<div class="skill-bar-track"><div class="skill-bar-fill" style="width:' + pct + '%"></div></div>' +
       '</div>'
     );
@@ -1123,4 +1138,59 @@ function onSubmitPractice(axisScores) {
     feedbackEl.textContent = '通信に失敗しました。もう一度お試しください。';
     feedbackEl.classList.add('incorrect');
   });
+}
+
+// ---- 単語発音再生機能 ----
+// 正誤判定・採点は行わない。1画面1単語で、「繰り返し」「次へ」の2ボタンのみ。
+function startPronunciation() {
+  showScreen('screen-pronunciation');
+  document.getElementById('pronunciationProgress').textContent = '読み込み中...';
+  document.getElementById('pronunciationEnglish').textContent = '';
+  document.getElementById('pronunciationKatakana').textContent = '';
+  document.getElementById('pronunciationJapanese').textContent = '';
+
+  callApi('getPronunciationWords', { token: state.token }).then(function (res) {
+    if (!res.ok || !res.words || res.words.length === 0) {
+      document.getElementById('pronunciationProgress').textContent = '0 / 0';
+      document.getElementById('pronunciationEnglish').textContent = '単語データがありません';
+      return;
+    }
+    state.pronunciationWords = res.words;
+    state.pronunciationIndex = 0;
+    renderPronunciationWord_();
+    playCurrentPronunciationWord_();
+  }).catch(function () {
+    document.getElementById('pronunciationProgress').textContent = '0 / 0';
+    document.getElementById('pronunciationEnglish').textContent = '通信に失敗しました';
+  });
+}
+
+function renderPronunciationWord_() {
+  const word = state.pronunciationWords[state.pronunciationIndex];
+  if (!word) return;
+  document.getElementById('pronunciationProgress').textContent =
+    (state.pronunciationIndex + 1) + ' / ' + state.pronunciationWords.length;
+  document.getElementById('pronunciationEnglish').textContent = word.english;
+  document.getElementById('pronunciationKatakana').textContent = word.katakana || '';
+  document.getElementById('pronunciationJapanese').textContent = word.japanese;
+}
+
+// 発音の再生自体を1回の「聴取」として記録する(「繰り返し」ボタンも、次の語への
+// 自動再生も、どちらも聴取回数としてカウントする仕様のため)
+function playCurrentPronunciationWord_() {
+  const word = state.pronunciationWords[state.pronunciationIndex];
+  if (!word) return;
+  speakText_(word.english, 1.0);
+  callApi('logPronunciationPlay', { token: state.token, vocabId: word.vocabId }).catch(function () { /* ignore */ });
+}
+
+function nextPronunciationWord() {
+  if (state.pronunciationIndex >= state.pronunciationWords.length - 1) {
+    // このバッチの最後まで聞き終えたら、続きのバッチを取得して再開する
+    startPronunciation();
+    return;
+  }
+  state.pronunciationIndex++;
+  renderPronunciationWord_();
+  playCurrentPronunciationWord_();
 }

@@ -152,10 +152,28 @@ input[type="text"] {
   padding: 2px 8px;
   border-radius: 999px;
 }
+.skill-level-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
 
 .quiz-card { text-align: center; padding: 32px 20px; }
 .quiz-word { font-size: 32px; font-weight: 700; color: var(--primary-dark); margin: 12px 0 4px; }
 .quiz-instruction { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+/* 単語発音再生機能(正誤判定なし・1画面1単語) */
+.pronunciation-card { text-align: center; padding: 40px 20px; }
+.pronunciation-word { font-size: 36px; font-weight: 700; color: var(--primary-dark); margin: 8px 0; }
+.pronunciation-katakana { font-size: 16px; color: var(--primary); margin: 0 0 8px; }
+.pronunciation-japanese { font-size: 18px; color: var(--muted); margin: 0 0 32px; }
+.pronunciation-buttons { display: flex; gap: 12px; justify-content: center; }
+.pronunciation-buttons .btn-primary { flex: 1; max-width: 160px; }
 
 /* 新規暗記カード(初めて見る単語をまず覚える画面) */
 .memorize-label {

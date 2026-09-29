@@ -276,6 +276,35 @@ input[type="text"] {
   resize: vertical;
   margin-bottom: 16px;
 }
+
+/* スピーキング補完練習(機能B: タイマー・テンプレート・録音・シャドーイング) */
+.speaking-practice-box {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 4px 0 16px;
+}
+.speaking-timer-display {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 8px 0 12px;
+}
+.speaking-practice-box .btn-primary { width: 100%; }
+#speakingRecordingPlayback { margin-top: 12px; }
+#speakingRecordingPlayback audio { width: 100%; margin-top: 4px; }
+.speaking-template-list { margin-top: 8px; }
+.speaking-template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.speaking-template-row:last-child { border-bottom: none; }
+.speaking-template-text { font-size: 13px; margin: 0; flex: 1; }
 .reading-blank {
   background: #ffe9a8;
   color: inherit;

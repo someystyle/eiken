@@ -24,7 +24,8 @@ const state = {
   isMockExam: false, // 5-3節: 月次模試を受験中かどうか
   mockTally: null, // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
   pronunciationWords: [], // 発音再生機能の今回のバッチ(10語)
-  pronunciationIndex: 0
+  pronunciationIndex: 0,
+  pronunciationSpeed: 1
 };
 
 // ---- 画面切替 ----
@@ -65,6 +66,7 @@ window.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('logoutBtn').addEventListener('click', function () {
+    stopSpeakingPracticeTimers_();
     stopSpeech_();
     safeRemoveLocalStorage(LS_TOKEN_KEY);
     state.token = null;
@@ -102,6 +104,8 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('writingPracticeBtn').addEventListener('click', function () { startPractice('Writing'); });
   document.getElementById('speakingPracticeBtn').addEventListener('click', function () { startPractice('Speaking'); });
   document.getElementById('quitPracticeBtn').addEventListener('click', function () {
+    stopSpeakingPracticeTimers_();
+    stopSpeech_();
     showScreen('screen-home');
     loadStats();
   });
@@ -109,6 +113,7 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('pronunciationBtn').addEventListener('click', startPronunciation);
   document.getElementById('pronunciationRepeatBtn').addEventListener('click', function () { playCurrentPronunciationWord_(); });
   document.getElementById('pronunciationNextBtn').addEventListener('click', nextPronunciationWord);
+  setupChipGroup('pronunciationSpeedChips', function (val) { state.pronunciationSpeed = Number(val) || 1; });
   document.getElementById('quitPronunciationBtn').addEventListener('click', function () {
     stopSpeech_();
     showScreen('screen-home');
@@ -510,7 +515,7 @@ function statItem(value, label) {
 
 // ---- 技能別実力スコア (5章) ----
 const SKILL_LABELS = {
-  Vocabulary: '語彙',
+  Vocabulary: 'ボキャブラリー（単語）',
   Reading: 'リーディング',
   Listening: 'リスニング',
   Writing: 'ライティング',
@@ -1016,6 +1021,8 @@ function renderPracticeCard(prompt) {
     '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
     '<textarea id="answerInput" class="answer-textarea" placeholder="ここに解答を書いてください(Speakingの場合は話した内容を書き起こしてください)" rows="6"></textarea>' +
 
+    (prompt.skill === 'Speaking' ? renderSpeakingPracticeBoxHtml_(prompt) : '') +
+
     '<p class="practice-step-label">② AIコーチに相談する</p>' +
     (hasUrl
       ? '<button id="notebookBtn" class="btn-primary listening-play-btn">📋 コピーしてAIコーチに相談する</button>' +
@@ -1064,6 +1071,10 @@ function renderPracticeCard(prompt) {
     onSubmitPractice(axisScores);
   });
 
+  if (prompt.skill === 'Speaking') {
+    setupSpeakingPracticeBox_(prompt);
+  }
+
   if (hasUrl) {
     document.getElementById('notebookBtn').addEventListener('click', function () {
       // 10-3節・8-5節: タップ削減のため、「ルーブリックで採点して」という依頼文+課題+
@@ -1084,6 +1095,140 @@ function renderPracticeCard(prompt) {
   }
 
   state.practiceStartTime = Date.now();
+}
+
+// ---- スピーキング補完練習 (機能B: 本番形式タイマー・回答テンプレート・自己録音・シャドーイング) ----
+// 正誤判定・採点は行わない自己練習ツール。①課題に取り組む欄と②AIコーチ相談欄の間に、
+// 任意で使える練習ブロックとして表示する(Speakingのみ)。
+let speakingCountdownTimer_ = null;
+let speakingMediaRecorder_ = null;
+
+function stopSpeakingPracticeTimers_() {
+  if (speakingCountdownTimer_) { clearInterval(speakingCountdownTimer_); speakingCountdownTimer_ = null; }
+  if (speakingMediaRecorder_ && speakingMediaRecorder_.state !== 'inactive') {
+    try { speakingMediaRecorder_.stop(); } catch (e) { /* ignore */ }
+  }
+  speakingMediaRecorder_ = null;
+}
+
+function renderSpeakingPracticeBoxHtml_(prompt) {
+  const templates = prompt.speakingTemplates || [];
+  return (
+    '<div id="speakingPracticeBox" class="speaking-practice-box">' +
+    '<p class="practice-step-label">🎯 本番形式で練習する(任意)</p>' +
+    '<p class="memorize-note">考慮時間→発話時間を本番と同じ感覚で練習できます。発話時間中は自動で録音されるので、後で自分の話し方を聞き直せます(採点はしません)。マイクを使えない場合も、タイマーだけで練習できます。</p>' +
+    '<div id="speakingTimerDisplay" class="speaking-timer-display">準備中...</div>' +
+    '<button id="speakingTimerStartBtn" class="btn-primary listening-play-btn">▶ タイマー練習を始める</button>' +
+    '<div id="speakingRecordingPlayback" style="display:none;"></div>' +
+    (templates.length > 0
+      ? '<p class="practice-step-label" style="margin-top:16px;">📋 回答テンプレート(型)</p>' +
+        '<p class="memorize-note">内容の独創性より「型」を持っているかが得点になりやすい形式です。声に出して練習しましょう。</p>' +
+        '<div id="speakingTemplateList" class="speaking-template-list"></div>'
+      : '') +
+    (prompt.promptType === '音読'
+      ? '<p class="practice-step-label" style="margin-top:16px;">🗣️ シャドーイング</p>' +
+        '<button id="speakingShadowBtn" class="btn-primary listening-play-btn">🔁 模範音声を再生(続けて声に出してみましょう)</button>'
+      : '') +
+    '</div>'
+  );
+}
+
+function setupSpeakingPracticeBox_(prompt) {
+  const timer = prompt.speakingTimer || { prepSec: 20, speakSec: 40 };
+  const templates = prompt.speakingTemplates || [];
+  const startBtn = document.getElementById('speakingTimerStartBtn');
+  const display = document.getElementById('speakingTimerDisplay');
+  const playbackEl = document.getElementById('speakingRecordingPlayback');
+
+  function runCountdown(seconds, label, onDone) {
+    let remaining = seconds;
+    display.textContent = label + ': 残り' + remaining + '秒';
+    if (speakingCountdownTimer_) clearInterval(speakingCountdownTimer_);
+    speakingCountdownTimer_ = setInterval(function () {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(speakingCountdownTimer_);
+        speakingCountdownTimer_ = null;
+        onDone();
+      } else {
+        display.textContent = label + ': 残り' + remaining + '秒';
+      }
+    }, 1000);
+  }
+
+  function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return;
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      const recordedChunks = [];
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (e) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        return;
+      }
+      speakingMediaRecorder_ = recorder;
+      recorder.ondataavailable = function (ev) { if (ev.data && ev.data.size > 0) recordedChunks.push(ev.data); };
+      recorder.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        if (recordedChunks.length > 0) {
+          const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(blob);
+          playbackEl.innerHTML = '<p class="section-label">自分の発話(聞き直せます)</p><audio controls src="' + url + '"></audio>';
+          playbackEl.style.display = '';
+        }
+      };
+      recorder.start();
+    }).catch(function () {
+      display.textContent = 'マイクを使用できませんでした(タイマーだけで練習を続けられます)';
+    });
+  }
+
+  function stopRecording() {
+    if (speakingMediaRecorder_ && speakingMediaRecorder_.state !== 'inactive') {
+      try { speakingMediaRecorder_.stop(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  startBtn.addEventListener('click', function () {
+    startBtn.disabled = true;
+    playbackEl.style.display = 'none';
+    runCountdown(timer.prepSec, '考慮時間', function () {
+      startRecording();
+      runCountdown(timer.speakSec, '発話時間(録音中)', function () {
+        stopRecording();
+        display.textContent = '練習おつかれさまでした！';
+        startBtn.disabled = false;
+        callApi('logSpeakingPractice', {
+          token: state.token, promptId: prompt.promptId, elapsedSec: timer.speakSec
+        }).catch(function () { /* ignore */ });
+      });
+    });
+  });
+
+  if (templates.length > 0) {
+    const listEl = document.getElementById('speakingTemplateList');
+    templates.forEach(function (t) {
+      const row = document.createElement('div');
+      row.className = 'speaking-template-row';
+      const textEl = document.createElement('p');
+      textEl.className = 'speaking-template-text';
+      textEl.textContent = t;
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.className = 'btn-link';
+      playBtn.textContent = '🔊 読み上げ';
+      playBtn.addEventListener('click', function () { speakText_(t, 1.0); });
+      row.appendChild(textEl);
+      row.appendChild(playBtn);
+      listEl.appendChild(row);
+    });
+  }
+
+  const shadowBtn = document.getElementById('speakingShadowBtn');
+  if (shadowBtn) {
+    shadowBtn.addEventListener('click', function () { speakText_(prompt.task, 1.0); });
+  }
 }
 
 function copyToClipboard_(text) {
@@ -1127,6 +1272,7 @@ function onSubmitPractice(axisScores) {
       feedbackEl.classList.add('incorrect');
     }
     setTimeout(function () {
+      stopSpeakingPracticeTimers_();
       showScreen('screen-home');
       loadStats();
     }, 1800);
@@ -1180,7 +1326,7 @@ function renderPronunciationWord_() {
 function playCurrentPronunciationWord_() {
   const word = state.pronunciationWords[state.pronunciationIndex];
   if (!word) return;
-  speakText_(word.english, 1.0);
+  speakText_(word.english, state.pronunciationSpeed);
   callApi('logPronunciationPlay', { token: state.token, vocabId: word.vocabId }).catch(function () { /* ignore */ });
 }
 

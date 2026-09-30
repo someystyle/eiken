@@ -84,6 +84,7 @@ window.addEventListener('DOMContentLoaded', function () {
     document.getElementById('statsBody').style.display = (val === 'numbers') ? '' : 'none';
     document.getElementById('statsGraphBody').style.display = (val === 'graph') ? '' : 'none';
   });
+  setupHomeTabs();
 
   document.getElementById('startBtn').addEventListener('click', startSession);
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
@@ -166,6 +167,27 @@ function setupChipGroup(containerId, onSelect) {
       onSelect(chip.dataset.value);
     });
   });
+}
+
+// ---- ホーム画面のタブ切替(Study/Data/Setting。縦に長くなりすぎたホーム画面を分割) ----
+const LS_HOME_TAB_KEY = 'eiken_family_home_tab';
+
+function switchHomeTab(tab) {
+  document.querySelectorAll('.home-tab').forEach(function (btn) {
+    btn.classList.toggle('selected', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.home-tab-panel').forEach(function (panel) {
+    panel.classList.toggle('active', panel.dataset.tabPanel === tab);
+  });
+  safeSetLocalStorage(LS_HOME_TAB_KEY, tab);
+}
+
+function setupHomeTabs() {
+  document.querySelectorAll('.home-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () { switchHomeTab(btn.dataset.tab); });
+  });
+  const saved = safeGetLocalStorage(LS_HOME_TAB_KEY);
+  if (saved) switchHomeTab(saved);
 }
 
 function updateStartBtn() {

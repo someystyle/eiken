@@ -35,114 +35,126 @@
     </button>
     <p id="aiCoachNote" class="memorize-note ai-coach-note" style="display:none;">今週の弱点データが更新されました</p>
 
-    <div class="card" id="debugModeCard" style="display:none;">
-      <h2>出題形式(確認用アカウント限定)</h2>
-      <p class="section-label">出題モード</p>
-      <div class="chip-group" id="debugModeChips">
-        <button class="chip selected" data-value="auto">自動(通常)</button>
-        <button class="chip" data-value="memorize">覚えるのみ</button>
-        <button class="chip" data-value="quiz">4択のみ</button>
-        <button class="chip" data-value="reading">Readingのみ</button>
-        <button class="chip" data-value="listening">Listeningのみ</button>
-      </div>
+    <div class="home-tab-bar" id="homeTabBar">
+      <button class="home-tab selected" data-tab="study">📖 Study</button>
+      <button class="home-tab" data-tab="data">📊 Data</button>
+      <button class="home-tab" data-tab="setting">⚙️ Setting</button>
     </div>
 
-    <div class="card">
-      <h2>今日のセッション</h2>
-      <p class="section-label">今使える時間</p>
-      <div class="chip-group" id="minutesChips">
-        <button class="chip" data-value="5">5分</button>
-        <button class="chip" data-value="10">10分</button>
-        <button class="chip" data-value="15">15分</button>
-        <button class="chip" data-value="30">30分</button>
-        <button class="chip" data-value="50">50分</button>
-        <button class="chip" data-value="60">60分+</button>
-      </div>
-
-      <p class="section-label">今のコンディション</p>
-      <div class="chip-group" id="conditionChips">
-        <button class="chip" data-value="元気">元気</button>
-        <button class="chip" data-value="普通">普通</button>
-        <button class="chip" data-value="疲れた">疲れた</button>
-      </div>
-
-      <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
-    </div>
-
-    <div class="card">
-      <h2>月次模試</h2>
-      <p class="section-label">本番同様の構成(Vocabulary17問・Reading14問・Listening30問、計61問)です。まとまった時間が必要です</p>
-      <button id="startMockExamBtn" class="btn-primary practice-btn">📝 月次模試を受ける</button>
-    </div>
-
-    <div class="card">
-      <h2>Writing / Speaking 練習</h2>
-      <p class="section-label">NotebookLM(AIコーチ)に貼り付けてフィードバックをもらいます</p>
-      <button id="writingPracticeBtn" class="btn-primary practice-btn">✏️ Writingを1問やる</button>
-      <button id="speakingPracticeBtn" class="btn-primary practice-btn">🗣️ Speakingを1問やる</button>
-    </div>
-
-    <div class="card">
-      <h2>発音を聞く</h2>
-      <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
-      <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 発音を聞く</button>
-    </div>
-
-    <div class="card stats-card">
-      <h2>これまでの進捗</h2>
-      <div class="chip-group" id="statsViewChips">
-        <button class="chip selected" data-value="numbers">数字で見る</button>
-        <button class="chip" data-value="graph">グラフで見る</button>
-      </div>
-      <div id="statsBody" class="stats-grid">読み込み中...</div>
-      <div id="statsGraphBody" class="stats-graph-body" style="display:none;"></div>
-    </div>
-
-    <div class="card">
-      <h2>技能別実力スコア</h2>
-      <p class="section-label">合格ラインに向けた進み具合(下がることはありません)</p>
-      <div id="skillScoreBody">読み込み中...</div>
-    </div>
-
-    <div class="card">
-      <h2>目標試験日とペース診断</h2>
-      <div id="paceDiagnosisBody" class="pace-diagnosis-body">読み込み中...</div>
-      <button id="toggleExamFormBtn" class="btn-link pause-toggle-btn">＋ 目標試験日を登録する</button>
-      <div id="examForm" class="pause-form" style="display:none;">
-        <p class="section-label">試験日</p>
-        <input type="date" id="examDateInput" min="2024-01-01" max="2035-12-31">
-        <button id="submitExamBtn" class="btn-primary">登録する</button>
-        <p id="examError" class="error-text"></p>
-      </div>
-      <button id="toggleExamResultFormBtn" class="btn-link pause-toggle-btn" style="display:none;">結果を記録する</button>
-      <div id="examResultForm" class="pause-form" style="display:none;">
-        <p class="section-label">結果</p>
-        <div class="chip-group" id="examResultChips">
-          <button class="chip" data-value="合格">合格</button>
-          <button class="chip" data-value="不合格">不合格</button>
+    <div class="home-tab-panel active" data-tab-panel="study">
+      <div class="card" id="debugModeCard" style="display:none;">
+        <h2>出題形式(確認用アカウント限定)</h2>
+        <p class="section-label">出題モード</p>
+        <div class="chip-group" id="debugModeChips">
+          <button class="chip selected" data-value="auto">自動(通常)</button>
+          <button class="chip" data-value="memorize">覚えるのみ</button>
+          <button class="chip" data-value="quiz">4択のみ</button>
+          <button class="chip" data-value="reading">Readingのみ</button>
+          <button class="chip" data-value="listening">Listeningのみ</button>
         </div>
-        <p class="memorize-note">技能別スコアが分かれば入力してください(任意・0〜100の目安値でOK)。分からない項目は空欄のままで構いません。</p>
-        <div id="examResultScoreInputs" class="exam-score-inputs"></div>
-        <button id="submitExamResultBtn" class="btn-primary">記録する</button>
-        <p id="examResultError" class="error-text"></p>
       </div>
-      <div id="examHistory" class="pause-list"></div>
+
+      <div class="card">
+        <h2>今日のセッション</h2>
+        <p class="section-label">今使える時間</p>
+        <div class="chip-group" id="minutesChips">
+          <button class="chip" data-value="5">5分</button>
+          <button class="chip" data-value="10">10分</button>
+          <button class="chip" data-value="15">15分</button>
+          <button class="chip" data-value="30">30分</button>
+          <button class="chip" data-value="50">50分</button>
+          <button class="chip" data-value="60">60分+</button>
+        </div>
+
+        <p class="section-label">今のコンディション</p>
+        <div class="chip-group" id="conditionChips">
+          <button class="chip" data-value="元気">元気</button>
+          <button class="chip" data-value="普通">普通</button>
+          <button class="chip" data-value="疲れた">疲れた</button>
+        </div>
+
+        <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
+      </div>
+
+      <div class="card">
+        <h2>発音を聞く</h2>
+        <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
+        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 発音を聞く</button>
+      </div>
+
+      <div class="card">
+        <h2>Writing / Speaking 練習</h2>
+        <p class="section-label">NotebookLM(AIコーチ)に貼り付けてフィードバックをもらいます</p>
+        <button id="writingPracticeBtn" class="btn-primary practice-btn">✏️ Writingを1問やる</button>
+        <button id="speakingPracticeBtn" class="btn-primary practice-btn">🗣️ Speakingを1問やる</button>
+      </div>
+
+      <div class="card">
+        <h2>月次模試</h2>
+        <p class="section-label">本番同様の構成(Vocabulary17問・Reading14問・Listening30問、計61問)です。まとまった時間が必要です</p>
+        <button id="startMockExamBtn" class="btn-primary practice-btn">📝 月次模試を受ける</button>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>休止期間</h2>
-      <p class="section-label">定期テスト・部活合宿など、学習をお休みする期間を登録できます</p>
-      <div id="pauseList" class="pause-list"></div>
-      <button id="togglePauseFormBtn" class="btn-link pause-toggle-btn">＋ 休止期間を登録する</button>
-      <div id="pauseForm" class="pause-form" style="display:none;">
-        <p class="section-label">開始日</p>
-        <input type="date" id="pauseStartInput" min="2024-01-01" max="2035-12-31">
-        <p class="section-label">終了日</p>
-        <input type="date" id="pauseEndInput" min="2024-01-01" max="2035-12-31">
-        <p class="section-label">理由(任意)</p>
-        <input type="text" id="pauseReasonInput" placeholder="例: 定期テスト、部活合宿">
-        <button id="submitPauseBtn" class="btn-primary">登録する</button>
-        <p id="pauseError" class="error-text"></p>
+    <div class="home-tab-panel" data-tab-panel="data">
+      <div class="card stats-card">
+        <h2>これまでの進捗</h2>
+        <div class="chip-group" id="statsViewChips">
+          <button class="chip selected" data-value="numbers">数字で見る</button>
+          <button class="chip" data-value="graph">グラフで見る</button>
+        </div>
+        <div id="statsBody" class="stats-grid">読み込み中...</div>
+        <div id="statsGraphBody" class="stats-graph-body" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>技能別実力スコア</h2>
+        <p class="section-label">合格ラインに向けた進み具合(下がることはありません)</p>
+        <div id="skillScoreBody">読み込み中...</div>
+      </div>
+    </div>
+
+    <div class="home-tab-panel" data-tab-panel="setting">
+      <div class="card">
+        <h2>目標試験日とペース診断</h2>
+        <div id="paceDiagnosisBody" class="pace-diagnosis-body">読み込み中...</div>
+        <button id="toggleExamFormBtn" class="btn-link pause-toggle-btn">＋ 目標試験日を登録する</button>
+        <div id="examForm" class="pause-form" style="display:none;">
+          <p class="section-label">試験日</p>
+          <input type="date" id="examDateInput" min="2024-01-01" max="2035-12-31">
+          <button id="submitExamBtn" class="btn-primary">登録する</button>
+          <p id="examError" class="error-text"></p>
+        </div>
+        <button id="toggleExamResultFormBtn" class="btn-link pause-toggle-btn" style="display:none;">結果を記録する</button>
+        <div id="examResultForm" class="pause-form" style="display:none;">
+          <p class="section-label">結果</p>
+          <div class="chip-group" id="examResultChips">
+            <button class="chip" data-value="合格">合格</button>
+            <button class="chip" data-value="不合格">不合格</button>
+          </div>
+          <p class="memorize-note">技能別スコアが分かれば入力してください(任意・0〜100の目安値でOK)。分からない項目は空欄のままで構いません。</p>
+          <div id="examResultScoreInputs" class="exam-score-inputs"></div>
+          <button id="submitExamResultBtn" class="btn-primary">記録する</button>
+          <p id="examResultError" class="error-text"></p>
+        </div>
+        <div id="examHistory" class="pause-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>休止期間</h2>
+        <p class="section-label">定期テスト・部活合宿など、学習をお休みする期間を登録できます</p>
+        <div id="pauseList" class="pause-list"></div>
+        <button id="togglePauseFormBtn" class="btn-link pause-toggle-btn">＋ 休止期間を登録する</button>
+        <div id="pauseForm" class="pause-form" style="display:none;">
+          <p class="section-label">開始日</p>
+          <input type="date" id="pauseStartInput" min="2024-01-01" max="2035-12-31">
+          <p class="section-label">終了日</p>
+          <input type="date" id="pauseEndInput" min="2024-01-01" max="2035-12-31">
+          <p class="section-label">理由(任意)</p>
+          <input type="text" id="pauseReasonInput" placeholder="例: 定期テスト、部活合宿">
+          <button id="submitPauseBtn" class="btn-primary">登録する</button>
+          <p id="pauseError" class="error-text"></p>
+        </div>
       </div>
     </div>
   </section>

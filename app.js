@@ -25,8 +25,10 @@ const state = {
   mockTally: null, // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
   pronunciationWords: [], // 発音再生機能の今回のバッチ(10語)
   pronunciationIndex: 0,
-  pronunciationSpeed: 1
-};
+  pronunciationSpeed: 1,
+  basicWords: [],
+  basicBlockSize: 50,
+  basicRunId: 0};
 
 // ---- 画面切替 ----
 function showScreen(id) {
@@ -117,6 +119,13 @@ window.addEventListener('DOMContentLoaded', function () {
   setupChipGroup('pronunciationSpeedChips', function (val) { state.pronunciationSpeed = Number(val) || 1; });
   document.getElementById('quitPronunciationBtn').addEventListener('click', function () {
     stopSpeech_();
+    showScreen('screen-home');
+    loadStats();
+  });
+
+  document.getElementById('basicPlayAllBtn').addEventListener('click', function () { startBasicPlayback_(null); });
+  document.getElementById('quitBasicBtn').addEventListener('click', function () {
+    stopBasicPlayback_();
     showScreen('screen-home');
     loadStats();
   });
@@ -214,6 +223,7 @@ function doLogin(token, silent) {
     updateAiCoachButton_(res.user);
     showScreen('screen-home');
     loadStats();
+    loadBasicWords_();
   }).catch(function () {
     if (!silent) errEl.textContent = '通信に失敗しました。GAS_API_URLの設定を確認してください。';
   });
@@ -1361,4 +1371,144 @@ function nextPronunciationWord() {
   state.pronunciationIndex++;
   renderPronunciationWord_();
   playCurrentPronunciationWord_();
+}
+
+// ---- 基礎語の流し聞き ----
+// 1語を標準速度で2回(1回目と2回目の間は2秒)読み上げて次の語へ進む。50語ずつの番号ボタンで
+// ブロック単位に聞け、聞き終えたブロックのボタンは色が反転する。全ブロックを聞き終えたら元の色に戻す。
+const BASIC_REPEAT_COUNT = 2;
+const BASIC_GAP_BETWEEN_REPEATS_MS = 2000;
+const BASIC_GAP_BETWEEN_WORDS_MS = 800;
+
+function basicPlayedKey_() {
+  return 'basicPlayed_' + ((state.user && state.user.userId) || 'unknown');
+}
+
+function loadBasicPlayed_() {
+  try {
+    const raw = safeGetLocalStorage(basicPlayedKey_());
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function saveBasicPlayed_(arr) {
+  try { localStorage.setItem(basicPlayedKey_(), JSON.stringify(arr)); } catch (e) { /* ignore */ }
+}
+
+function basicBlockCount_() {
+  return Math.ceil(state.basicWords.length / state.basicBlockSize);
+}
+
+function loadBasicWords_() {
+  callApi('getBasicWords', { token: state.token }).then(function (res) {
+    if (!res.ok || !res.words || res.words.length === 0) return;
+    state.basicWords = res.words;
+    state.basicBlockSize = Number(res.blockSize) || 50;
+    document.getElementById('basicPlayAllBtn').disabled = false;
+    renderBasicBlockButtons_();
+  }).catch(function () { /* 基礎語が読めなくても他の機能は使えるようにする */ });
+}
+
+function renderBasicBlockButtons_() {
+  const grid = document.getElementById('basicBlockGrid');
+  const played = loadBasicPlayed_();
+  grid.innerHTML = '';
+  for (let b = 1; b <= basicBlockCount_(); b++) {
+    const btn = document.createElement('button');
+    btn.className = 'basic-block-btn' + (played.indexOf(b) >= 0 ? ' played' : '');
+    btn.textContent = String(b);
+    btn.addEventListener('click', function () { startBasicPlayback_(b); });
+    grid.appendChild(btn);
+  }
+}
+
+function markBasicBlockPlayed_(block) {
+  const played = loadBasicPlayed_();
+  if (played.indexOf(block) < 0) played.push(block);
+  // 全ブロックを聞き終えたら、番号ボタンの色を全部元に戻す
+  saveBasicPlayed_(played.length >= basicBlockCount_() ? [] : played);
+  renderBasicBlockButtons_();
+}
+
+function stopBasicPlayback_() {
+  state.basicRunId++;
+  stopSpeech_();
+}
+
+// 読み上げが終わるまで待つ。onendが来ない環境でも止まらないよう、文字数に応じた時間で打ち切る。
+function speakAndWait_(text, rate, runId, done) {
+  if (runId !== state.basicRunId) return;
+  let finished = false;
+  const finish = function () {
+    if (finished) return;
+    finished = true;
+    done();
+  };
+  try {
+    if (!window.speechSynthesis) { setTimeout(finish, 1500); return; }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = rate || 1.0;
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    window.speechSynthesis.speak(utterance);
+    setTimeout(finish, Math.max(4000, text.length * 400));
+  } catch (e) {
+    setTimeout(finish, 1500);
+  }
+}
+
+// block が null なら1番から最後まで通しで流す。番号が指定されたらそのブロックだけ流す。
+function startBasicPlayback_(block) {
+  if (state.basicWords.length === 0) return;
+  stopBasicPlayback_();
+  const runId = state.basicRunId;
+  const blocks = (block === null) ? Array.from({ length: basicBlockCount_() }, function (_, i) { return i + 1; }) : [block];
+  showScreen('screen-basic');
+  playBasicBlocks_(blocks, 0, runId);
+}
+
+function playBasicBlocks_(blocks, blockIdx, runId) {
+  if (runId !== state.basicRunId) return;
+  if (blockIdx >= blocks.length) {
+    showScreen('screen-home');
+    loadStats();
+    return;
+  }
+  const block = blocks[blockIdx];
+  const start = (block - 1) * state.basicBlockSize;
+  const words = state.basicWords.slice(start, start + state.basicBlockSize);
+  playBasicWords_(block, words, 0, runId, function () {
+    markBasicBlockPlayed_(block);
+    playBasicBlocks_(blocks, blockIdx + 1, runId);
+  });
+}
+
+function playBasicWords_(block, words, idx, runId, onBlockDone) {
+  if (runId !== state.basicRunId) return;
+  if (idx >= words.length) { onBlockDone(); return; }
+  const word = words[idx];
+  document.getElementById('basicProgress').textContent = (idx + 1) + ' / ' + words.length;
+  document.getElementById('basicBlockLabel').textContent = '基礎語 ' + block + ' / ' + basicBlockCount_();
+  document.getElementById('basicEnglish').textContent = word.english;
+  document.getElementById('basicKatakana').textContent = word.katakana || '';
+  document.getElementById('basicJapanese').textContent = word.japanese;
+
+  let pass = 0;
+  const playPass = function () {
+    if (runId !== state.basicRunId) return;
+    pass++;
+    document.getElementById('basicPass').textContent = pass + '回目';
+    speakAndWait_(word.english, 1.0, runId, function () {
+      if (runId !== state.basicRunId) return;
+      if (pass < BASIC_REPEAT_COUNT) {
+        setTimeout(playPass, BASIC_GAP_BETWEEN_REPEATS_MS);
+      } else {
+        setTimeout(function () { playBasicWords_(block, words, idx + 1, runId, onBlockDone); }, BASIC_GAP_BETWEEN_WORDS_MS);
+      }
+    });
+  };
+  playPass();
 }

@@ -79,7 +79,10 @@
       <div class="card">
         <h2>発音を聞く</h2>
         <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
-        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 発音を聞く</button>
+        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 今のレベルの単語を聞く</button>
+        <p class="section-label" style="margin-top:20px;">基礎語(1語を標準速度で2回、間は2秒)</p>
+        <button id="basicPlayAllBtn" class="btn-primary practice-btn" disabled>▶ 基礎語を流し聞き</button>
+        <div id="basicBlockGrid" class="basic-block-grid"></div>
       </div>
 
       <div class="card">
@@ -198,6 +201,21 @@
         <button class="chip selected" data-value="1">標準</button>
         <button class="chip" data-value="1.25">1.25倍</button>
       </div>
+    </div>
+  </section>
+
+  <!-- 基礎語 流し聞き画面 -->
+  <section id="screen-basic" class="screen">
+    <header class="app-header">
+      <div id="basicProgress">0 / 0</div>
+      <button id="quitBasicBtn" class="btn-link">中断</button>
+    </header>
+    <div class="card pronunciation-card">
+      <p class="section-label" id="basicBlockLabel"></p>
+      <p class="pronunciation-word" id="basicEnglish"></p>
+      <p class="pronunciation-katakana" id="basicKatakana"></p>
+      <p class="pronunciation-japanese" id="basicJapanese"></p>
+      <p class="section-label" id="basicPass"></p>
     </div>
   </section>
 

@@ -466,3 +466,7 @@ input[type="text"] {
   color: var(--primary-dark);
   margin: 6px 0 0;
 }
+
+.basic-block-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.basic-block-btn { min-width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--primary); background: #fff; color: var(--primary-dark); font-size: 16px; font-weight: 700; cursor: pointer; }
+.basic-block-btn.played { background: var(--primary); color: #fff; }

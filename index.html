@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2026-10-07a">
 </head>
 <body>
 
@@ -23,6 +23,7 @@
       </div>
       <div id="manualLoginBox">
         <p class="lead">最初の1回だけ、あなた専用のトークンを入力してください。<br>次回からは自動的にログインされます。</p>
+        <p class="memorize-note app-version"></p>
         <input id="tokenInput" type="text" placeholder="アクセストークンを入力" autocomplete="off">
         <button id="loginBtn" class="btn-primary">はじめる</button>
         <p id="loginError" class="error-text"></p>
@@ -214,6 +215,8 @@
           <p id="pauseError" class="error-text"></p>
         </div>
       </div>
+
+      <p class="memorize-note app-version"></p>
     </div>
   </section>
 
@@ -326,7 +329,7 @@
 
 </div>
 
-<script src="app.js"></script>
-  <script src="vocab.js"></script>
+<script src="app.js?v=2026-10-07a"></script>
+  <script src="vocab.js?v=2026-10-07a"></script>
 </body>
 </html>

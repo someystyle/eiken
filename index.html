@@ -37,11 +37,6 @@
       <button id="logoutBtn" class="btn-link">アカウント切替</button>
     </header>
 
-    <button id="aiCoachBtn" class="btn-primary ai-coach-btn" style="display:none;">
-      🤖 AIコーチに相談する<span id="aiCoachBadge" class="ai-coach-badge" style="display:none;">●</span>
-    </button>
-    <p id="aiCoachNote" class="memorize-note ai-coach-note" style="display:none;">今週の弱点データが更新されました</p>
-
     <div class="home-tab-bar" id="homeTabBar">
       <button class="home-tab selected" data-tab="study">📖 Study</button>
       <button class="home-tab" data-tab="data">📊 Data</button>
@@ -118,7 +113,7 @@
         <div class="chip-group" id="pronGroupChips"></div>
         <p class="section-label" id="pronStartLabel">開始位置(空欄なら前回の続きから)</p>
         <div class="vocab-range">
-          <input type="number" id="pronStartInput" min="1" inputmode="numeric" placeholder="続きから">
+          <input type="number" id="pronStartInput" class="vocab-start" min="1" inputmode="numeric" placeholder="空欄=前回の続き">
         </div>
         <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 このグループを10語ずつ聞く</button>
         <div id="basicSection">

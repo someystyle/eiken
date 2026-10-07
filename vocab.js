@@ -11,8 +11,11 @@ const vstate = {
   cardKind: 't1900',
   test: null,
   saveTimer: null,
-  saveSeq: 0,
-  dirty: false // 未保存の変更がある間は、サーバーの値でチェック欄を上書きしない
+  saving: false,       // 保存の通信中か(保存は1つずつ順番に送る)
+  pendingSave: false,  // 保存中にさらに変更があったか
+  dirty: false,        // 未保存の変更があるか
+  settingsLoaded: false, // 最初の読み込み後は、サーバーの値でチェック欄を描き直さない(手元の状態を正とする)
+  loadSeq: 0
 };
 
 const VOCAB_SCOPES = [
@@ -111,12 +114,16 @@ function leaveVocabScreen_() {
 }
 
 function loadVocabHome_() {
+  const seq = ++vstate.loadSeq;
   return callApi('getVocabOverview', { token: state.token }).then(function (res) {
     if (!res.ok) return;
+    if (seq !== vstate.loadSeq) return; // 遅れて届いた古い応答は捨てる(新しい取得の結果だけを使う)
     vstate.overview = res;
-    // 保存前の変更(または保存中の変更)がある間は、サーバーに保存済みの古い設定でチェック欄を描き直さない
-    if (!vstate.dirty) {
+    // チェック欄は、最初の1回だけサーバーの保存値で描く。以降は手元の状態を正とし、
+    // 遅れて届いた応答や保存前の古い値で、押したチェックが消えたり戻ったりしないようにする。
+    if (!vstate.settingsLoaded && !vstate.dirty) {
       vstate.settings = res.settings;
+      vstate.settingsLoaded = true;
       renderVocabSettings_();
     }
     renderVocabScope_();
@@ -208,19 +215,23 @@ function setVocabSaveStatus_(text, isError) {
   el.classList.toggle('error-text', !!isError);
 }
 
+// 保存は1つずつ順番に送る(通信が遅いときに2つ同時に送ると、サーバーで順番が入れ替わり、古い設定が後から保存されることがある)
 function saveVocabSettingsNow_() {
-  const s = vstate.settings;
-  const seq = ++vstate.saveSeq;
+  if (vstate.saving) { vstate.pendingSave = true; return; }
+  vstate.saving = true;
+  vstate.pendingSave = false;
   setVocabSaveStatus_('保存中...', false);
-  callApi('saveVocabSettings', { token: state.token, settings: JSON.stringify(s) }).then(function (res) {
-    if (seq !== vstate.saveSeq) return; // その後にさらに変更されていれば、そちらの保存結果を待つ
-    if (!res.ok) { setVocabSaveStatus_('保存できませんでした。もう一度チェックを操作してください。', true); return; }
+  const finish = function (ok) {
+    vstate.saving = false;
+    if (vstate.pendingSave) { saveVocabSettingsNow_(); return; } // 保存中にさらに変更があれば、最新の状態をもう一度保存する
+    if (!ok) { setVocabSaveStatus_('保存できませんでした。もう一度チェックを操作してください。', true); return; }
     vstate.dirty = false;
     setVocabSaveStatus_('保存しました ✓', false);
     loadVocabHome_();
-  }).catch(function () {
-    if (seq === vstate.saveSeq) setVocabSaveStatus_('通信に失敗し、保存できませんでした。もう一度チェックを操作してください。', true);
-  });
+  };
+  callApi('saveVocabSettings', { token: state.token, settings: JSON.stringify(vstate.settings) }).then(function (res) {
+    finish(!!res.ok);
+  }).catch(function () { finish(false); });
 }
 
 function onVocabSettingChanged_() {

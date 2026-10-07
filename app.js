@@ -53,7 +53,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-07a';
+const APP_VERSION = '2026-10-07b';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -243,6 +243,10 @@ function finishLogin_(token, res) {
   document.getElementById('debugModeCard').style.display = (res.user.role === '保護者確認用') ? '' : 'none';
   showScreen('screen-home');
   loadStats();
+  // 利用者が変わった場合に備え、単語の設定は新しいログインのたびに読み込み直す
+  vstate.settingsLoaded = false;
+  vstate.dirty = false;
+  vstate.settings = null;
   loadVocabHome_();
 }
 

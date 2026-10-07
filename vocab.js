@@ -120,9 +120,30 @@ function loadVocabHome_() {
       renderVocabSettings_();
     }
     renderVocabScope_();
+    renderPronGroups_();
     renderVocabOverview_();
     loadBasicWords_();
   }).catch(function () { /* 単語以外の機能は使えるようにする */ });
+}
+
+// 発音を聞くグループの選択(Settingでオンになっているグループだけ出す)
+function renderPronGroups_() {
+  const s = vstate.settings;
+  if (!s) return;
+  const groups = VOCAB_SCOPES.filter(function (sc) { return sc.visible(s); });
+  if (!groups.some(function (g) { return g.key === state.pronGroup; })) state.pronGroup = 't1900';
+  const box = document.getElementById('pronGroupChips');
+  box.innerHTML = '';
+  groups.forEach(function (g) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (g.key === state.pronGroup ? ' selected' : '');
+    b.textContent = g.label;
+    b.addEventListener('click', function () { state.pronGroup = g.key; renderPronGroups_(); });
+    box.appendChild(b);
+  });
+  document.getElementById('pronStartLabel').textContent = (state.pronGroup === 't1900')
+    ? '開始する出る順番号(空欄なら前回の続きから)'
+    : '開始位置(グループ内の番号。空欄なら前回の続きから)';
 }
 
 // ---- Setting ----
@@ -210,6 +231,7 @@ function onVocabSettingChanged_() {
   const v8opt = document.querySelector('#vocabSettingsBody input[data-key="v8opt"]');
   if (v8opt) { v8opt.disabled = !s.v8; if (!s.v8) v8opt.checked = false; }
   renderVocabScope_();
+  renderPronGroups_();
   setVocabSaveStatus_('変更を保存します...', false);
   clearTimeout(vstate.saveTimer);
   vstate.saveTimer = setTimeout(saveVocabSettingsNow_, 400);

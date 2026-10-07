@@ -56,15 +56,20 @@ window.addEventListener('DOMContentLoaded', function () {
   const saved = safeGetLocalStorage(LS_TOKEN_KEY);
   if (saved) {
     state.token = saved;
-    doLogin(saved, true);
+    autoLogin_(saved, 1);
   } else {
     showScreen('screen-login');
   }
 
+  document.getElementById('autoLoginRetryBtn').addEventListener('click', function () {
+    autoLogin_(safeGetLocalStorage(LS_TOKEN_KEY) || state.token, 1);
+  });
+  document.getElementById('autoLoginOtherBtn').addEventListener('click', showManualLogin_);
+
   document.getElementById('loginBtn').addEventListener('click', function () {
     const val = document.getElementById('tokenInput').value.trim();
     if (!val) return;
-    doLogin(val, false);
+    doLogin(val);
   });
 
   document.getElementById('logoutBtn').addEventListener('click', function () {
@@ -76,7 +81,7 @@ window.addEventListener('DOMContentLoaded', function () {
     state.debugMode = 'auto';
     document.getElementById('tokenInput').value = '';
     document.getElementById('debugModeCard').style.display = 'none';
-    showScreen('screen-login');
+    showManualLogin_();
   });
 
   setupChipGroup('minutesChips', function (val) { state.minutes = val; updateStartBtn(); });
@@ -113,7 +118,10 @@ window.addEventListener('DOMContentLoaded', function () {
     loadStats();
   });
 
-  document.getElementById('pronunciationBtn').addEventListener('click', startPronunciation);
+  document.getElementById('pronunciationBtn').addEventListener('click', function () {
+    const v = parseInt(document.getElementById('pronStartInput').value, 10);
+    startPronunciation(isNaN(v) || v < 1 ? null : v);
+  });
   document.getElementById('pronunciationRepeatBtn').addEventListener('click', function () { playCurrentPronunciationWord_(); });
   document.getElementById('pronunciationNextBtn').addEventListener('click', nextPronunciationWord);
   setupChipGroup('pronunciationSpeedChips', function (val) { state.pronunciationSpeed = Number(val) || 1; });
@@ -205,28 +213,70 @@ function updateStartBtn() {
 }
 
 // ---- ログイン (3-3節: 初回のみトークン入力、以降はlocalStorageで自動ログイン) ----
-function doLogin(token, silent) {
+// 保存済みトークンでの自動ログインは、通信の失敗や応答の遅れ(GASの起動待ち)では入力画面に戻さず、
+// 自動で再試行する。トークンを消すのは、サーバーが「無効なトークン」と返したときだけ。
+const AUTO_LOGIN_MAX_ATTEMPTS = 3;
+
+function showManualLogin_() {
+  document.getElementById('autoLoginBox').style.display = 'none';
+  document.getElementById('manualLoginBox').style.display = '';
+  showScreen('screen-login');
+}
+
+function showAutoLogin_(message, canRetry) {
+  document.getElementById('manualLoginBox').style.display = 'none';
+  document.getElementById('autoLoginBox').style.display = '';
+  document.getElementById('autoLoginMsg').textContent = message;
+  document.getElementById('autoLoginRetryBtn').style.display = canRetry ? '' : 'none';
+  showScreen('screen-login');
+}
+
+function finishLogin_(token, res) {
+  state.token = token;
+  state.user = res.user;
+  safeSetLocalStorage(LS_TOKEN_KEY, token);
+  document.getElementById('userNameLabel').textContent = res.user.name + ' さん';
+  // 保護者確認用アカウントだけ、出題形式を任意に指定できるデバッグ欄を出す
+  document.getElementById('debugModeCard').style.display = (res.user.role === '保護者確認用') ? '' : 'none';
+  // 10-3節: 「AIコーチに相談」ボタンを常設し、週次更新直後は未読バッジを出す
+  updateAiCoachButton_(res.user);
+  showScreen('screen-home');
+  loadStats();
+  loadVocabHome_();
+}
+
+function autoLogin_(token, attempt) {
+  showAutoLogin_(attempt > 1 ? 'ログイン中...(再試行 ' + attempt + '/' + AUTO_LOGIN_MAX_ATTEMPTS + ')' : 'ログイン中...', false);
+  const retryOrGiveUp = function () {
+    if (attempt < AUTO_LOGIN_MAX_ATTEMPTS) {
+      setTimeout(function () { autoLogin_(token, attempt + 1); }, 1500 * attempt);
+    } else {
+      showAutoLogin_('通信できませんでした。電波の状態を確認して、もう一度お試しください。', true);
+    }
+  };
+  callApi('login', { token: token }).then(function (res) {
+    if (res.ok) { finishLogin_(token, res); return; }
+    if (/無効なトークン/.test(String(res.error || ''))) {
+      safeRemoveLocalStorage(LS_TOKEN_KEY);
+      showManualLogin_();
+      document.getElementById('loginError').textContent = '保存されていたトークンが無効です。もう一度入力してください。';
+      return;
+    }
+    retryOrGiveUp();
+  }).catch(retryOrGiveUp);
+}
+
+function doLogin(token) {
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
   callApi('login', { token: token }).then(function (res) {
     if (!res.ok) {
-      if (!silent) errEl.textContent = 'トークンが正しくありません。';
-      showScreen('screen-login');
+      errEl.textContent = 'トークンが正しくありません。';
       return;
     }
-    state.token = token;
-    state.user = res.user;
-    safeSetLocalStorage(LS_TOKEN_KEY, token);
-    document.getElementById('userNameLabel').textContent = res.user.name + ' さん';
-    // 保護者確認用アカウントだけ、出題形式を任意に指定できるデバッグ欄を出す
-    document.getElementById('debugModeCard').style.display = (res.user.role === '保護者確認用') ? '' : 'none';
-    // 10-3節: 「AIコーチに相談」ボタンを常設し、週次更新直後は未読バッジを出す
-    updateAiCoachButton_(res.user);
-    showScreen('screen-home');
-    loadStats();
-    loadVocabHome_();
+    finishLogin_(token, res);
   }).catch(function () {
-    if (!silent) errEl.textContent = '通信に失敗しました。GAS_API_URLの設定を確認してください。';
+    errEl.textContent = '通信に失敗しました。GAS_API_URLの設定を確認してください。';
   });
 }
 
@@ -1321,20 +1371,27 @@ function onSubmitPractice(axisScores) {
 
 // ---- 単語発音再生機能 ----
 // 正誤判定・採点は行わない。1画面1単語で、「繰り返し」「次へ」の2ボタンのみ。
-function startPronunciation() {
+// グループ(T1900見出し語・派生語・過去問…)を選んで、10語ずつ聞く。startを指定するとその位置から、
+// 指定しなければ、そのグループで前回聞いた語の続きから始まる。
+function startPronunciation(startPos) {
   showScreen('screen-pronunciation');
   document.getElementById('pronunciationProgress').textContent = '読み込み中...';
+  document.getElementById('pronunciationRange').textContent = '';
+  document.getElementById('pronunciationNo').textContent = '';
   document.getElementById('pronunciationEnglish').textContent = '';
   document.getElementById('pronunciationKatakana').textContent = '';
   document.getElementById('pronunciationJapanese').textContent = '';
 
-  callApi('getPronunciationWords', { token: state.token }).then(function (res) {
+  const params = { token: state.token, group: state.pronGroup || 't1900' };
+  if (startPos) params.start = startPos;
+  callApi('getPronunciationWords', params).then(function (res) {
     if (!res.ok || !res.words || res.words.length === 0) {
       document.getElementById('pronunciationProgress').textContent = '0 / 0';
-      document.getElementById('pronunciationEnglish').textContent = '単語データがありません';
+      document.getElementById('pronunciationEnglish').textContent = res.disabled ? 'このグループはSettingでオフになっています' : '単語データがありません';
       return;
     }
     state.pronunciationWords = res.words;
+    state.pronunciationMeta = res;
     state.pronunciationIndex = 0;
     renderPronunciationWord_();
     playCurrentPronunciationWord_();
@@ -1349,6 +1406,14 @@ function renderPronunciationWord_() {
   if (!word) return;
   document.getElementById('pronunciationProgress').textContent =
     (state.pronunciationIndex + 1) + ' / ' + state.pronunciationWords.length;
+  const meta = state.pronunciationMeta;
+  if (meta) {
+    const total = Number(meta.total).toLocaleString();
+    document.getElementById('pronunciationRange').textContent = meta.isT1900
+      ? meta.groupLabel + ' ' + meta.from + '〜' + meta.to + '番(全' + total + '語)を聞いています'
+      : meta.groupLabel + ' ' + total + '語中 ' + meta.from + '〜' + meta.to + '番目を聞いています';
+    document.getElementById('pronunciationNo').textContent = meta.isT1900 ? ('出る順 ' + word.no + '番') : (word.no + ' / ' + total + '番目');
+  }
   document.getElementById('pronunciationEnglish').textContent = word.english;
   document.getElementById('pronunciationKatakana').textContent = word.katakana || '';
   document.getElementById('pronunciationJapanese').textContent = word.japanese;

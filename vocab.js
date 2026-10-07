@@ -10,7 +10,9 @@ const vstate = {
   cardIndex: 0,
   cardKind: 't1900',
   test: null,
-  saveTimer: null
+  saveTimer: null,
+  saveSeq: 0,
+  dirty: false // 未保存の変更がある間は、サーバーの値でチェック欄を上書きしない
 };
 
 const VOCAB_SCOPES = [
@@ -112,8 +114,11 @@ function loadVocabHome_() {
   return callApi('getVocabOverview', { token: state.token }).then(function (res) {
     if (!res.ok) return;
     vstate.overview = res;
-    vstate.settings = res.settings;
-    renderVocabSettings_();
+    // 保存前の変更(または保存中の変更)がある間は、サーバーに保存済みの古い設定でチェック欄を描き直さない
+    if (!vstate.dirty) {
+      vstate.settings = res.settings;
+      renderVocabSettings_();
+    }
     renderVocabScope_();
     renderVocabOverview_();
     loadBasicWords_();
@@ -175,19 +180,39 @@ function collectVocabSettings_() {
   return out;
 }
 
+function setVocabSaveStatus_(text, isError) {
+  const el = document.getElementById('vocabSaveStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('error-text', !!isError);
+}
+
+function saveVocabSettingsNow_() {
+  const s = vstate.settings;
+  const seq = ++vstate.saveSeq;
+  setVocabSaveStatus_('保存中...', false);
+  callApi('saveVocabSettings', { token: state.token, settings: JSON.stringify(s) }).then(function (res) {
+    if (seq !== vstate.saveSeq) return; // その後にさらに変更されていれば、そちらの保存結果を待つ
+    if (!res.ok) { setVocabSaveStatus_('保存できませんでした。もう一度チェックを操作してください。', true); return; }
+    vstate.dirty = false;
+    setVocabSaveStatus_('保存しました ✓', false);
+    loadVocabHome_();
+  }).catch(function () {
+    if (seq === vstate.saveSeq) setVocabSaveStatus_('通信に失敗し、保存できませんでした。もう一度チェックを操作してください。', true);
+  });
+}
+
 function onVocabSettingChanged_() {
   const s = collectVocabSettings_();
   vstate.settings = s;
+  vstate.dirty = true;
   document.getElementById('vocabSpeedLabel').textContent = Number(s.speed).toFixed(2) + '倍';
   const v8opt = document.querySelector('#vocabSettingsBody input[data-key="v8opt"]');
   if (v8opt) { v8opt.disabled = !s.v8; if (!s.v8) v8opt.checked = false; }
   renderVocabScope_();
+  setVocabSaveStatus_('変更を保存します...', false);
   clearTimeout(vstate.saveTimer);
-  vstate.saveTimer = setTimeout(function () {
-    callApi('saveVocabSettings', { token: state.token, settings: JSON.stringify(s) }).then(function () {
-      loadVocabHome_();
-    }).catch(function () { /* 保存に失敗しても画面操作は続けられる */ });
-  }, 600);
+  vstate.saveTimer = setTimeout(saveVocabSettingsNow_, 400);
 }
 
 // ---- Study: 範囲とモード ----

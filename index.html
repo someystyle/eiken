@@ -107,7 +107,7 @@
       <div class="card">
         <h2>発音を聞く</h2>
         <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
-        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 対象の単語を聞く</button>
+        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 設定した対象の単語を聞く</button>
         <div id="basicSection">
         <p class="section-label" style="margin-top:20px;">基礎語(1語を標準速度で2回、間は2秒)</p>
         <button id="basicPlayAllBtn" class="btn-primary practice-btn" disabled>▶ 基礎語を流し聞き</button>
@@ -162,6 +162,7 @@
         <div class="chip-group" id="vocabTestFormChips"></div>
         <p class="section-label">読み上げ速度: <span id="vocabSpeedLabel">1.00倍</span></p>
         <input type="range" id="vocabSpeedInput" min="0.6" max="1.2" step="0.05" value="1" class="vocab-speed">
+        <p id="vocabSaveStatus" class="memorize-note"></p>
       </div>
 
       <div class="card">

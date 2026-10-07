@@ -14,25 +14,33 @@ const vstate = {
 };
 
 const VOCAB_SCOPES = [
-  { key: 't1900', label: 'T1900', setting: null },
-  { key: 'kakomon', label: '過去問', setting: 'kakomon' },
-  { key: 'ss', label: 'SS', setting: 'ss' },
-  { key: 'jun1', label: '準1級', setting: 'jun1' },
-  { key: 'teap', label: 'TEAP', setting: 'teap' },
-  { key: 'v8', label: 'v8語彙', setting: 'v8' },
-  { key: 'v8opt', label: 'v8(任意)', setting: 'v8opt' }
+  { key: 't1900', label: 'T1900', visible: function () { return true; } },
+  { key: 'derived', label: 'T1900派生語', visible: function (s) { return s.derived; } },
+  { key: 'kakomon', label: '過去問', visible: function (s) { return s.kakomon; } },
+  { key: 'ss', label: 'SS', visible: function (s) { return s.ss || s.v8; } },
+  { key: 'v8', label: 'S・A・B', visible: function (s) { return s.v8; } },
+  { key: 'v8opt', label: 'B3・D', visible: function (s) { return s.v8 && s.v8opt; } },
+  { key: 'jun1', label: 'T1900準1級', visible: function (s) { return s.jun1; } },
+  { key: 'teap', label: 'T1900TEAP', visible: function (s) { return s.teap; } }
+];
+
+const VOCAB_TEST_FORMS = [
+  { key: 'mix', label: 'ミックス' },
+  { key: 'en2ja', label: '英語→意味' },
+  { key: 'ja2en', label: '意味→英語' },
+  { key: 'audio2ja', label: '音声→意味' }
 ];
 
 const VOCAB_SETTING_TOGGLES = [
-  { key: 'derived', label: '派生語を含む' },
+  { key: 'derived', label: 'T1900派生語を含む' },
   { key: 'kakomon', label: '過去問の語を含む' },
-  { key: 'ss', label: 'SSを含む' },
-  { key: 'jun1', label: '英検準1級を含む' },
-  { key: 'teap', label: 'TEAPを含む' },
-  { key: 'v8', label: 'v8語彙を含む' },
-  { key: 'v8opt', label: 'v8語彙(任意)を含む(v8語彙オンのときのみ)' },
+  { key: 'ss', label: '外部ソースSSランクを含む' },
+  { key: 'jun1', label: 'T1900英検準1級を含む' },
+  { key: 'teap', label: 'T1900TEAPを含む' },
+  { key: 'v8', label: '外部ソースSS・S・A・Bランク(v8語彙)を含む' },
+  { key: 'v8opt', label: 'v8語彙(任意:B3・D)を含む(v8オンのときのみ)' },
   { key: 'basic', label: '基礎語(音声のみ・流し聞き)' },
-  { key: 'sound', label: '音声' },
+  { key: 'sound', label: '音声(電車モードとは同時にオンにできません)' },
   { key: 'trainMode', label: '電車モード(音声ボタン・自動再生なし)' }
 ];
 
@@ -63,8 +71,9 @@ function setupVocab_() {
     renderVocabScope_();
   });
   document.getElementById('vocabStartBtn').addEventListener('click', startVocabFromScope_);
+  document.getElementById('vocabSpeedInput').addEventListener('input', onVocabSettingChanged_);
   document.getElementById('vocabT1900AutoTestBtn').addEventListener('click', function () {
-    startVocabTest_({ kind: 't1900', tOnly: '1', includeDerived: vstate.settings && vstate.settings.derived ? '1' : '0' }, true);
+    startVocabTest_({ kind: 't1900', tOnly: '1', onlyKnown: '1', includeDerived: vstate.settings && vstate.settings.derived ? '1' : '0' }, true);
   });
   document.getElementById('vocabT1900RangeTestBtn').addEventListener('click', function () {
     const r = readT1900Range_();
@@ -74,7 +83,7 @@ function setupVocab_() {
     startVocabCards_({ kind: 't1900', from: 1, to: 1900, reviewOnly: '1' });
   });
   document.getElementById('vocabNoticeTestBtn').addEventListener('click', function () {
-    startVocabTest_({ kind: 't1900', tOnly: '1', includeDerived: vstate.settings && vstate.settings.derived ? '1' : '0' }, true);
+    startVocabTest_({ kind: 't1900', tOnly: '1', onlyKnown: '1', includeDerived: vstate.settings && vstate.settings.derived ? '1' : '0' }, true);
   });
   ['vocabRangeFrom', 'vocabRangeTo'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', saveVocabRange_);
@@ -124,7 +133,13 @@ function renderVocabSettings_() {
     cb.checked = !!s[t.key];
     cb.dataset.key = t.key;
     if (t.key === 'v8opt' && !s.v8) cb.disabled = true;
-    cb.addEventListener('change', function () { onVocabSettingChanged_(); });
+    cb.addEventListener('change', function () {
+      if (cb.checked && (t.key === 'sound' || t.key === 'trainMode')) {
+        const other = document.querySelector('#vocabSettingsBody input[data-key="' + (t.key === 'sound' ? 'trainMode' : 'sound') + '"]');
+        if (other) other.checked = false;
+      }
+      onVocabSettingChanged_();
+    });
     label.appendChild(cb);
     label.appendChild(document.createTextNode(' ' + t.label));
     box.appendChild(label);
@@ -134,6 +149,19 @@ function renderVocabSettings_() {
   fixed.textContent = 'T1900見出し語(1,900語)は常に対象です。';
   box.appendChild(fixed);
   document.getElementById('vocabSpeedInput').value = s.speed;
+  const tf = document.getElementById('vocabTestFormChips');
+  tf.innerHTML = '';
+  VOCAB_TEST_FORMS.forEach(function (f) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (f.key === s.testForm ? ' selected' : '');
+    b.dataset.value = f.key;
+    b.textContent = f.label;
+    b.addEventListener('click', function () {
+      tf.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('selected', x === b); });
+      onVocabSettingChanged_();
+    });
+    tf.appendChild(b);
+  });
   document.getElementById('vocabSpeedLabel').textContent = Number(s.speed).toFixed(2) + '倍';
 }
 
@@ -141,6 +169,8 @@ function collectVocabSettings_() {
   const out = {};
   document.querySelectorAll('#vocabSettingsBody input[type=checkbox]').forEach(function (cb) { out[cb.dataset.key] = cb.checked; });
   out.speed = Number(document.getElementById('vocabSpeedInput').value) || 1.0;
+  const tfSel = document.querySelector('#vocabTestFormChips .chip.selected');
+  out.testForm = tfSel ? tfSel.dataset.value : 'mix';
   if (!out.v8) out.v8opt = false;
   return out;
 }
@@ -182,7 +212,7 @@ function renderVocabScope_() {
   const chips = document.getElementById('vocabScopeChips');
   chips.innerHTML = '';
   VOCAB_SCOPES.forEach(function (sc) {
-    if (sc.setting && !s[sc.setting]) return;
+    if (!sc.visible(s)) return;
     const b = document.createElement('button');
     b.className = 'chip' + (sc.key === vstate.scope ? ' selected' : '');
     b.dataset.value = sc.key;
@@ -330,7 +360,7 @@ function startVocabTest_(params, isT1900) {
   const p = Object.assign({ count: 20 }, params);
   callApi('getVocabTest', Object.assign({ token: state.token }, p)).then(function (res) {
     if (!res.ok || !res.questions || res.questions.length === 0) {
-      body.innerHTML = '<p class="memorize-note">' + (res.disabled ? 'このグループはSettingでオフになっています。' : '出題できる語がありません。') + '</p>';
+      body.innerHTML = '<p class="memorize-note">' + (res.disabled ? 'このグループはSettingでオフになっています。' : (res.noKnown ? '「覚えた」を押した単語がまだありません。先にカードで「覚えた」を押してください。' : '出題できる語がありません。')) + '</p>';
       return;
     }
     vstate.test = {
@@ -453,12 +483,23 @@ function renderVocabOverview_() {
   const notice = document.getElementById('vocabNotice');
   notice.style.display = o.needT1900Check ? '' : 'none';
 
-  let html = '<div class="vstage-grid">';
+  let html = '<p class="section-label">段階は上から順に進みます。前の段階の累計習得率が' + o.gateRate + '%になると次が解放されます(目標は' + o.goalRate + '%)。' +
+    (o.examNear ? '試験日が近いため、現在はすべて解放されています。' : '') + '</p><div class="vstage-grid">';
   o.stages.forEach(function (s) {
-    html += '<div class="vstage"><div class="vstage-label">段階' + s.stage + ' ' + escapeHtml_(s.label) + '</div>' +
-      (s.started
-        ? '<div class="vbar"><div class="vbar-fill" style="width:' + s.percent + '%"></div></div><div class="vstage-pct">' + s.percent + '%(' + s.mastered + ' / ' + s.total + ')</div>'
-        : '<div class="vstage-pct vstage-off">未開始</div>') + '</div>';
+    if (s.enabled && s.total === 0) return; // 該当する語がない段階は出さない
+    html += '<div class="vstage"><div class="vstage-label">' + escapeHtml_(s.label) + '</div>';
+    if (!s.started) {
+      html += '<div class="vstage-pct vstage-off">未開始(Settingでオフ)</div>';
+    } else {
+      html += '<div class="vbar"><div class="vbar-fill" style="width:' + s.percent + '%"></div>' +
+        '<div class="vbar-goal" style="left:' + o.goalRate + '%" title="目標' + o.goalRate + '%"></div></div>' +
+        '<div class="vstage-pct">習得 ' + s.percent + '%(' + s.mastered + ' / ' + s.total + ')' +
+        (s.stage === 'X' ? '' : ' ・ 累計 ' + s.cumPercent + '%') + '</div>';
+      if (!s.open) {
+        html += '<div class="vstage-lock">🔒 ロック中(' + escapeHtml_(s.prevLabel || '前の段階') + 'の累計習得が' + o.gateRate + '%で解放。いま ' + (s.prevCumPercent === null ? 0 : s.prevCumPercent) + '%)</div>';
+      }
+    }
+    html += '</div>';
   });
   html += '</div>';
   html += '<p class="section-label">全体カバー率(対象の語のうち習得した割合): <b>' + o.coverage + '%</b></p>';

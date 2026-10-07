@@ -75,9 +75,10 @@
         </div>
         <button id="vocabStartBtn" class="btn-primary">覚える</button>
         <p class="memorize-note" id="vocabTargetCount"></p>
+        <p class="memorize-note">派生語は「覚える」のカードに常に表示されます。テストに出すのは、Settingで派生語をオンにした場合だけです。
         <p class="section-label" style="margin-top:16px;">T1900</p>
         <button id="vocabT1900RangeTestBtn" class="btn-primary practice-btn">T1900だけテスト(この範囲)</button>
-        <button id="vocabT1900AutoTestBtn" class="btn-primary practice-btn">T1900だけテスト(おまかせ)</button>
+        <button id="vocabT1900AutoTestBtn" class="btn-primary practice-btn">T1900だけテスト(おまかせ・覚えた単語から)</button>
         <button id="vocabReviewCardsBtn" class="btn-primary practice-btn">要復習だけ覚える</button>
       </div>
 
@@ -157,6 +158,8 @@
         <h2>単語の設定</h2>
         <p class="section-label">対象にする語を選びます(選んだ条件のどれかに当てはまる語が対象です)</p>
         <div id="vocabSettingsBody" class="vocab-settings">読み込み中...</div>
+        <p class="section-label">テストの出題形式</p>
+        <div class="chip-group" id="vocabTestFormChips"></div>
         <p class="section-label">読み上げ速度: <span id="vocabSpeedLabel">1.00倍</span></p>
         <input type="range" id="vocabSpeedInput" min="0.6" max="1.2" step="0.05" value="1" class="vocab-speed">
       </div>

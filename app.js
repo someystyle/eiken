@@ -123,6 +123,7 @@ window.addEventListener('DOMContentLoaded', function () {
     loadStats();
   });
 
+  setupVocab_();
   document.getElementById('basicPlayAllBtn').addEventListener('click', function () { startBasicPlayback_(null); });
   document.getElementById('quitBasicBtn').addEventListener('click', function () {
     stopBasicPlayback_();
@@ -223,7 +224,7 @@ function doLogin(token, silent) {
     updateAiCoachButton_(res.user);
     showScreen('screen-home');
     loadStats();
-    loadBasicWords_();
+    loadVocabHome_();
   }).catch(function () {
     if (!silent) errEl.textContent = '通信に失敗しました。GAS_API_URLの設定を確認してください。';
   });
@@ -1402,6 +1403,7 @@ function basicBlockCount_() {
 
 function loadBasicWords_() {
   callApi('getBasicWords', { token: state.token }).then(function (res) {
+    document.getElementById('basicSection').style.display = (res.ok && !res.disabled && res.words && res.words.length > 0) ? '' : 'none';
     if (!res.ok || !res.words || res.words.length === 0) return;
     state.basicWords = res.words;
     state.basicBlockSize = Number(res.blockSize) || 50;

@@ -54,6 +54,33 @@
         </div>
       </div>
 
+      <div class="card" id="vocabCard">
+        <h2>単語</h2>
+        <div id="vocabNotice" class="vocab-notice" style="display:none;">
+          <span>T1900を確認しましょう</span>
+          <button id="vocabNoticeTestBtn" class="btn-link">T1900だけテスト</button>
+        </div>
+        <p class="section-label">範囲</p>
+        <div class="chip-group" id="vocabScopeChips"></div>
+        <p class="section-label" id="vocabRangeLabel">出る順番号(1〜1900)</p>
+        <div class="vocab-range">
+          <input type="number" id="vocabRangeFrom" min="1" inputmode="numeric" value="1">
+          <span>〜</span>
+          <input type="number" id="vocabRangeTo" min="1" inputmode="numeric" value="100">
+        </div>
+        <p class="section-label">モード</p>
+        <div class="chip-group" id="vocabModeChips">
+          <button class="chip selected" data-value="learn">覚える</button>
+          <button class="chip" data-value="test">テスト</button>
+        </div>
+        <button id="vocabStartBtn" class="btn-primary">覚える</button>
+        <p class="memorize-note" id="vocabTargetCount"></p>
+        <p class="section-label" style="margin-top:16px;">T1900</p>
+        <button id="vocabT1900RangeTestBtn" class="btn-primary practice-btn">T1900だけテスト(この範囲)</button>
+        <button id="vocabT1900AutoTestBtn" class="btn-primary practice-btn">T1900だけテスト(おまかせ)</button>
+        <button id="vocabReviewCardsBtn" class="btn-primary practice-btn">要復習だけ覚える</button>
+      </div>
+
       <div class="card">
         <h2>今日のセッション</h2>
         <p class="section-label">今使える時間</p>
@@ -79,10 +106,12 @@
       <div class="card">
         <h2>発音を聞く</h2>
         <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
-        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 今のレベルの単語を聞く</button>
+        <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 対象の単語を聞く</button>
+        <div id="basicSection">
         <p class="section-label" style="margin-top:20px;">基礎語(1語を標準速度で2回、間は2秒)</p>
         <button id="basicPlayAllBtn" class="btn-primary practice-btn" disabled>▶ 基礎語を流し聞き</button>
         <div id="basicBlockGrid" class="basic-block-grid"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -111,6 +140,12 @@
       </div>
 
       <div class="card">
+        <h2>単語の進捗</h2>
+        <p class="section-label">段階ごとに別々に表示します(習得 = テストで直近2回連続正解、かつ最終正解から30日以内)</p>
+        <div id="vocabOverviewBody">読み込み中...</div>
+      </div>
+
+      <div class="card">
         <h2>技能別実力スコア</h2>
         <p class="section-label">合格ラインに向けた進み具合(下がることはありません)</p>
         <div id="skillScoreBody">読み込み中...</div>
@@ -118,6 +153,14 @@
     </div>
 
     <div class="home-tab-panel" data-tab-panel="setting">
+      <div class="card">
+        <h2>単語の設定</h2>
+        <p class="section-label">対象にする語を選びます(選んだ条件のどれかに当てはまる語が対象です)</p>
+        <div id="vocabSettingsBody" class="vocab-settings">読み込み中...</div>
+        <p class="section-label">読み上げ速度: <span id="vocabSpeedLabel">1.00倍</span></p>
+        <input type="range" id="vocabSpeedInput" min="0.6" max="1.2" step="0.05" value="1" class="vocab-speed">
+      </div>
+
       <div class="card">
         <h2>目標試験日とペース診断</h2>
         <div id="paceDiagnosisBody" class="pace-diagnosis-body">読み込み中...</div>
@@ -219,6 +262,45 @@
     </div>
   </section>
 
+  <!-- 単語: 覚えるカード -->
+  <section id="screen-vcards" class="screen">
+    <header class="app-header">
+      <div id="vcardProgress"></div>
+      <button id="quitVcardBtn" class="btn-link">中断</button>
+    </header>
+    <div class="card vcard">
+      <div id="vcardBody"></div>
+      <div class="vcard-buttons">
+        <button id="vcardUnknownBtn" class="btn-primary vbtn-unknown">まだ</button>
+        <button id="vcardKnownBtn" class="btn-primary">覚えた</button>
+      </div>
+      <div class="vcard-nav">
+        <button id="vcardPrevBtn" class="btn-link">◀ 前へ</button>
+        <button id="vcardNextBtn" class="btn-link">次へ ▶</button>
+      </div>
+      <p class="memorize-note">スマホでは、右へスワイプ=覚えた / 左へスワイプ=まだ</p>
+    </div>
+  </section>
+
+  <!-- 単語: テスト -->
+  <section id="screen-vtest" class="screen">
+    <header class="app-header">
+      <div id="vtestProgress"></div>
+      <button id="quitVtestBtn" class="btn-link">中断</button>
+    </header>
+    <div class="card" id="vtestBody"></div>
+  </section>
+
+  <!-- 単語: テスト結果 -->
+  <section id="screen-vresult" class="screen">
+    <div class="card">
+      <h2>テスト結果</h2>
+      <div id="vresultBody"></div>
+      <button id="vresultRetryBtn" class="btn-primary">もう一度</button>
+      <button id="vresultHomeBtn" class="btn-primary">ホームに戻る</button>
+    </div>
+  </section>
+
   <!-- 結果画面 -->
   <section id="screen-result" class="screen">
     <div class="card">
@@ -231,5 +313,6 @@
 </div>
 
 <script src="app.js"></script>
+  <script src="vocab.js"></script>
 </body>
 </html>

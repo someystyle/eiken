@@ -470,3 +470,48 @@ input[type="text"] {
 .basic-block-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .basic-block-btn { min-width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--primary); background: #fff; color: var(--primary-dark); font-size: 16px; font-weight: 700; cursor: pointer; }
 .basic-block-btn.played { background: var(--primary); color: #fff; }
+
+/* 単語機能 v9 */
+.vocab-notice { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff4d6; border: 1px solid #e8c766; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-weight: 700; }
+.vocab-range { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.vocab-range input { width: 90px; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; }
+.vocab-toggle { display: block; padding: 8px 0; font-size: 15px; }
+.vocab-toggle input { width: 20px; height: 20px; vertical-align: middle; margin-right: 6px; }
+.vocab-speed { width: 100%; }
+.vword { text-align: center; margin: 10px 0; }
+.vword-big .vword-en { font-size: 34px; }
+.vword-en { font-size: 22px; font-weight: 700; color: var(--primary-dark); }
+.vword-ph { color: #555; font-size: 16px; margin-top: 2px; }
+.vword-ka { color: var(--primary); font-size: 15px; }
+.vword-ja { font-size: 18px; margin-top: 4px; }
+.vword-ja-big { font-size: 26px; font-weight: 700; }
+.vword-pos { color: #777; font-size: 14px; }
+.vspeak-btn { border: none; background: transparent; font-size: 22px; cursor: pointer; }
+.vspeak-big { max-width: 240px; }
+.vsub { margin-top: 18px; text-align: left; }
+.vtag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; margin-left: 6px; }
+.vtag-review { background: #fde2e2; color: #b42318; }
+.vtag-known { background: #dff3e6; color: #1b4332; }
+.vcard-buttons { display: flex; gap: 12px; margin-top: 18px; }
+.vcard-buttons .btn-primary { flex: 1; }
+.vbtn-unknown { background: #8a8a8a; }
+.vcard-nav { display: flex; justify-content: space-between; margin-top: 8px; }
+.vtest-feedback { min-height: 28px; margin: 10px 0; font-weight: 700; text-align: center; }
+.vtest-feedback.correct { color: #1b7f3b; }
+.vtest-feedback.incorrect { color: #b42318; }
+.choice-btn.correct { background: #dff3e6; border-color: #1b7f3b; }
+.choice-btn.incorrect { background: #fde2e2; border-color: #b42318; }
+.vwrong-list { padding-left: 20px; }
+.vstage-grid { display: grid; gap: 10px; margin-bottom: 12px; }
+.vstage-label { font-size: 14px; margin-bottom: 4px; }
+.vbar { height: 12px; background: #e5e5e5; border-radius: 6px; overflow: hidden; }
+.vbar-fill { height: 100%; background: var(--primary); }
+.vstage-pct { font-size: 13px; color: #555; margin-top: 2px; }
+.vstage-off { color: #999; font-style: italic; }
+.vblocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; margin-bottom: 12px; }
+.vblock-bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: #ddd; }
+.vblock-bar span, .vlegend { display: inline-block; height: 100%; }
+.vblock-no { font-size: 11px; color: #666; text-align: center; }
+.vl-m { background: #2d6a4f; } .vl-l { background: #95d5b2; } .vl-x { background: #e8a33d; } .vl-n { background: #ddd; }
+.vlegend { padding: 1px 6px; margin-left: 4px; font-size: 11px; color: #fff; border-radius: 3px; height: auto; }
+.vlegend.vl-l, .vlegend.vl-n { color: #333; }

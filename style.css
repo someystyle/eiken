@@ -449,9 +449,6 @@ input[type="text"] {
   margin: 6px 0 0;
 }
 
-.basic-block-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.basic-block-btn { min-width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--primary); background: #fff; color: var(--primary-dark); font-size: 16px; font-weight: 700; cursor: pointer; }
-.basic-block-btn.played { background: var(--primary); color: #fff; }
 
 /* 単語機能 v9 */
 .vocab-notice { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff4d6; border: 1px solid #e8c766; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-weight: 700; }
@@ -504,3 +501,6 @@ input[type="text"] {
 
 .vocab-range input.vocab-start { width: 170px; }
 .vocab-start::placeholder { font-size: 13px; color: #999; }
+
+.vocab-voice-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.vocab-select { flex: 1; min-width: 0; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }

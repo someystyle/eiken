@@ -15,7 +15,10 @@ const vstate = {
   pendingSave: false,  // 保存中にさらに変更があったか
   dirty: false,        // 未保存の変更があるか
   settingsLoaded: false, // 最初の読み込み後は、サーバーの値でチェック欄を描き直さない(手元の状態を正とする)
-  loadSeq: 0
+  loadSeq: 0,
+  speakTimer: null,
+  cardTotal: 0,
+  cardLabel: ''
 };
 
 const VOCAB_SCOPES = [
@@ -28,6 +31,9 @@ const VOCAB_SCOPES = [
   { key: 'jun1', label: 'T1900準1級', visible: function (s) { return s.jun1; } },
   { key: 'teap', label: 'T1900TEAP', visible: function (s) { return s.teap; } }
 ];
+
+// 発音を聞くグループ: 覚える・テストのグループに、基礎語(音声のみ)を足したもの
+const PRON_GROUPS = VOCAB_SCOPES.concat([{ key: 'basic', label: '基礎語', visible: function (s) { return s.basic; } }]);
 
 const VOCAB_TEST_FORMS = [
   { key: 'mix', label: 'ミックス' },
@@ -44,7 +50,7 @@ const VOCAB_SETTING_TOGGLES = [
   { key: 'teap', label: 'T1900TEAPを含む' },
   { key: 'v8', label: '外部ソースSS・S・A・Bランク(v8語彙)を含む' },
   { key: 'v8opt', label: 'v8語彙(任意:B3・D)を含む(v8オンのときのみ)' },
-  { key: 'basic', label: '基礎語(音声のみ・流し聞き)' },
+  { key: 'basic', label: '基礎語(音声のみ。「発音を聞く」で聞けます)' },
   { key: 'sound', label: '音声(電車モードとは同時にオンにできません)' },
   { key: 'trainMode', label: '電車モード(音声ボタン・自動再生なし)' }
 ];
@@ -57,8 +63,22 @@ function vocabSoundOn_() {
   return !!vstate.settings && vstate.settings.sound && !vstate.settings.trainMode;
 }
 
+// 速度と声は speakText_ がSettingの値を使う。すぐ読むのは、🔊ボタンを押したときだけ。
 function vocabSpeak_(text) {
-  speakText_(text, (vstate.settings && vstate.settings.speed) || 1.0);
+  speakText_(text);
+}
+
+// 単語が画面に出てから少し遅れて読み上げる(まず目で見て理解してから、音を聞くため)
+const VOCAB_SPEAK_DELAY_MS = 800;
+const VOCAB_SPEAK_DELAY_AUDIO_QUESTION_MS = 500; // 音声→意味の問題は、音そのものが問題なので短め
+
+function vocabCancelSpeakTimer_() {
+  if (vstate.speakTimer) { clearTimeout(vstate.speakTimer); vstate.speakTimer = null; }
+}
+
+function vocabSpeakDelayed_(text, delayMs) {
+  vocabCancelSpeakTimer_();
+  vstate.speakTimer = setTimeout(function () { vstate.speakTimer = null; vocabSpeak_(text); }, delayMs || VOCAB_SPEAK_DELAY_MS);
 }
 
 // ---- 初期化・再読み込み ----
@@ -77,6 +97,10 @@ function setupVocab_() {
   });
   document.getElementById('vocabStartBtn').addEventListener('click', startVocabFromScope_);
   document.getElementById('vocabSpeedInput').addEventListener('input', onVocabSettingChanged_);
+  document.getElementById('vocabVoiceSelect').addEventListener('change', onVocabSettingChanged_);
+  document.getElementById('vocabVoiceTestBtn').addEventListener('click', function () {
+    speakText_('Hello. This is a sample of the selected voice.');
+  });
   document.getElementById('vocabT1900AutoTestBtn').addEventListener('click', function () {
     startVocabTest_({ kind: 't1900', tOnly: '1', onlyKnown: '1', includeDerived: vstate.settings && vstate.settings.derived ? '1' : '0' }, true);
   });
@@ -129,28 +153,47 @@ function loadVocabHome_() {
     renderVocabScope_();
     renderPronGroups_();
     renderVocabOverview_();
-    loadBasicWords_();
   }).catch(function () { /* 単語以外の機能は使えるようにする */ });
 }
 
-// 発音を聞くグループの選択(Settingでオンになっているグループだけ出す)
+// 発音を聞くグループの選択(Settingでオンになっているグループだけ出す。各グループの合計語数つき)
+function vocabGroupTotal_(key) {
+  const t = vstate.overview && vstate.overview.groupTotals ? vstate.overview.groupTotals[key] : null;
+  return (t === null || t === undefined) ? null : Number(t);
+}
+
+// 表示するグループか(Settingでオンで、該当する語が1語以上あるもの。例: 「過去問の語」をオンにすると、SSの語は
+// すべて過去問の語に含まれるため、SS専用のグループは0語になり出さない)
+function vocabGroupVisible_(g, s) {
+  if (!g.visible(s)) return false;
+  const t = vocabGroupTotal_(g.key);
+  return t === null || t > 0;
+}
+
+function vocabGroupLabelWithTotal_(g) {
+  const t = vocabGroupTotal_(g.key);
+  return t === null ? g.label : (g.label + '(' + t.toLocaleString() + '語)');
+}
+
 function renderPronGroups_() {
   const s = vstate.settings;
   if (!s) return;
-  const groups = VOCAB_SCOPES.filter(function (sc) { return sc.visible(s); });
+  const groups = PRON_GROUPS.filter(function (sc) { return vocabGroupVisible_(sc, s); });
   if (!groups.some(function (g) { return g.key === state.pronGroup; })) state.pronGroup = 't1900';
   const box = document.getElementById('pronGroupChips');
   box.innerHTML = '';
   groups.forEach(function (g) {
     const b = document.createElement('button');
     b.className = 'chip' + (g.key === state.pronGroup ? ' selected' : '');
-    b.textContent = g.label;
+    b.textContent = vocabGroupLabelWithTotal_(g);
     b.addEventListener('click', function () { state.pronGroup = g.key; renderPronGroups_(); });
     box.appendChild(b);
   });
+  const total = vocabGroupTotal_(state.pronGroup);
+  const totalText = total === null ? '' : '全' + total.toLocaleString() + '語・';
   document.getElementById('pronStartLabel').textContent = (state.pronGroup === 't1900')
-    ? '開始する出る順番号(空欄なら前回の続きから)'
-    : '開始位置(グループ内の番号。空欄なら前回の続きから)';
+    ? '開始する出る順番号(' + totalText + '空欄なら前回の続きから)'
+    : '開始位置(' + totalText + 'グループ内の番号。空欄なら前回の続きから)';
 }
 
 // ---- Setting ----
@@ -195,6 +238,7 @@ function renderVocabSettings_() {
     });
     tf.appendChild(b);
   });
+  renderVoiceSelect_();
   document.getElementById('vocabSpeedLabel').textContent = Number(s.speed).toFixed(2) + '倍';
 }
 
@@ -202,6 +246,8 @@ function collectVocabSettings_() {
   const out = {};
   document.querySelectorAll('#vocabSettingsBody input[type=checkbox]').forEach(function (cb) { out[cb.dataset.key] = cb.checked; });
   out.speed = Number(document.getElementById('vocabSpeedInput').value) || 1.0;
+  const voiceSel = document.getElementById('vocabVoiceSelect');
+  out.voice = voiceSel ? voiceSel.value : '';
   const tfSel = document.querySelector('#vocabTestFormChips .chip.selected');
   out.testForm = tfSel ? tfSel.dataset.value : 'mix';
   if (!out.v8) out.v8opt = false;
@@ -270,11 +316,11 @@ function renderVocabScope_() {
   const chips = document.getElementById('vocabScopeChips');
   chips.innerHTML = '';
   VOCAB_SCOPES.forEach(function (sc) {
-    if (!sc.visible(s)) return;
+    if (!vocabGroupVisible_(sc, s)) return;
     const b = document.createElement('button');
     b.className = 'chip' + (sc.key === vstate.scope ? ' selected' : '');
     b.dataset.value = sc.key;
-    b.textContent = sc.label;
+    b.textContent = vocabGroupLabelWithTotal_(sc);
     chips.appendChild(b);
   });
   if (!chips.querySelector('.selected')) { // オフにされたグループが選択中だった場合はT1900へ戻す
@@ -285,7 +331,11 @@ function renderVocabScope_() {
 
   const fromEl = document.getElementById('vocabRangeFrom'), toEl = document.getElementById('vocabRangeTo');
   const isT = vstate.scope === 't1900';
-  document.getElementById('vocabRangeLabel').textContent = isT ? '出る順番号(1〜1900)' : 'グループ内の位置';
+  const scTotal = vocabGroupTotal_(vstate.scope);
+  const scTotalText = scTotal === null ? '' : '全' + scTotal.toLocaleString() + '語';
+  document.getElementById('vocabRangeLabel').textContent = isT
+    ? '出る順番号(1〜1900。' + scTotalText + ')'
+    : 'グループ内の位置(' + scTotalText + 'のうち何番目から何番目まで)';
   if (!fromEl.dataset.init) {
     fromEl.dataset.init = '1';
     let saved = null;
@@ -333,6 +383,8 @@ function startVocabCards_(params) {
     vstate.cards = res.cards;
     vstate.cardIndex = 0;
     vstate.cardKind = res.kind;
+    vstate.cardTotal = Number(res.total) || 0;
+    vstate.cardLabel = res.groupLabel || '';
     renderVocabCard_();
   }).catch(function () {
     document.getElementById('vcardBody').innerHTML = '<p class="memorize-note">通信に失敗しました。</p>';
@@ -361,7 +413,8 @@ function renderVocabCard_() {
   document.getElementById('vcardProgress').textContent = (vstate.cardIndex + 1) + ' / ' + total;
   let html = '';
   const w = card.word;
-  const label = vstate.cardKind === 't1900' ? ('出る順 ' + card.number) : ('No.' + card.number);
+  const totalText = vstate.cardTotal ? ' / 全' + vstate.cardTotal.toLocaleString() + '語' : '';
+  const label = (vstate.cardLabel ? vstate.cardLabel + ' ' : '') + (vstate.cardKind === 't1900' ? ('出る順 ' + card.number) : ('' + card.number + '番目')) + totalText;
   html += '<p class="section-label">' + label + (w.review ? ' <span class="vtag vtag-review">要復習</span>' : '') +
     (w.status === '覚えた' ? ' <span class="vtag vtag-known">覚えた</span>' : '') + '</p>';
   html += vocabWordHtml_(w, true);
@@ -377,7 +430,7 @@ function renderVocabCard_() {
   const body = document.getElementById('vcardBody');
   body.innerHTML = html;
   bindSpeakButtons_(body);
-  if (vocabSoundOn_()) vocabSpeak_(w.english);
+  if (vocabSoundOn_()) vocabSpeakDelayed_(w.english);
 }
 
 function moveVocabCard_(delta) {
@@ -464,7 +517,7 @@ function renderVocabQuestion_() {
     list.appendChild(btn);
   });
   document.getElementById('vtestNextBtn').addEventListener('click', nextVocabQuestion_);
-  if (q.form === 'audio2ja' && vocabSoundOn_()) vocabSpeak_(q.english);
+  if (q.form === 'audio2ja' && vocabSoundOn_()) vocabSpeakDelayed_(q.english, VOCAB_SPEAK_DELAY_AUDIO_QUESTION_MS);
 }
 
 function onVocabChoose_(q, choice, btn) {
@@ -499,7 +552,7 @@ function onVocabChoose_(q, choice, btn) {
         t.queue.push(q);
         document.getElementById('vtestProgress').textContent = (t.index + 1) + ' / ' + t.queue.length;
       }
-      if (vocabSoundOn_()) vocabSpeak_(res.answer.english);
+      if (vocabSoundOn_()) vocabSpeakDelayed_(res.answer.english);
       showVocabNext_();
     }
   }).catch(function () {
@@ -579,4 +632,48 @@ function renderVocabOverview_() {
       o.weakWords.map(function (w) { return '<li><b>' + escapeHtml_(w.english) + '</b> ' + escapeHtml_(w.meaning) + '(×' + w.wrong + ')</li>'; }).join('') + '</ul>';
   }
   document.getElementById('vocabOverviewBody').innerHTML = html;
+}
+
+// ---- 声の選択(Setting) ----
+// ブラウザの音声合成は、声の性別を教えてくれない。そのため、声の名前から「女性」「男性」「その他」に分ける
+// (端末によって使える声が違い、名前から判断できないものは「その他」に入る)。
+const TTS_FEMALE_RE = /(female|samantha|victoria|karen|moira|tessa|fiona|allison|ava\b|susan|zira|hazel|jenny|aria|michelle|emma|sonia|libby|amy|joanna|kendra|kimberly|salli|ivy|nicole|olivia|serena|kate|catherine|shelley|sandy|flo\b|martha|heather|linda|ellen|natasha|clara|mia|ana|nora|sara)/i;
+const TTS_MALE_RE = /(male|alex|daniel|fred|tom\b|oliver|aaron|david|mark\b|guy\b|ryan|davis|christopher|eric|brian|matthew|george|james|rishi|arthur|gordon|reed|rocko|eddy|ralph|junior|william|andrew|roger|steffan|thomas|jason)/i;
+
+function ttsGenderOf_(name) {
+  if (TTS_FEMALE_RE.test(name)) return 'female';
+  if (TTS_MALE_RE.test(name)) return 'male';
+  return 'other';
+}
+
+function renderVoiceSelect_() {
+  const sel = document.getElementById('vocabVoiceSelect');
+  if (!sel) return;
+  const saved = (vstate.settings && vstate.settings.voice) || '';
+  const voices = (typeof ttsVoices_ !== 'undefined' ? ttsVoices_ : []).filter(function (v) { return /^en/i.test(v.lang); });
+  sel.innerHTML = '';
+  const add = function (parent, value, text) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = text;
+    parent.appendChild(o);
+  };
+  add(sel, '', '自動(この端末の標準の声)');
+  [['female', '女性の声'], ['male', '男性の声'], ['other', 'その他の声']].forEach(function (g) {
+    const list = voices.filter(function (v) { return ttsGenderOf_(v.name) === g[0]; });
+    if (list.length === 0) return;
+    const grp = document.createElement('optgroup');
+    grp.label = g[1];
+    list.forEach(function (v) { add(grp, v.name, v.name + '(' + v.lang + ')'); });
+    sel.appendChild(grp);
+  });
+  // 保存済みの声がこの端末にない場合も、選択を消さずに残す(別の端末で選んだ声など)
+  if (saved && !voices.some(function (v) { return v.name === saved; })) add(sel, saved, saved + '(この端末では使えません)');
+  sel.value = saved;
+  const note = document.getElementById('vocabVoiceNote');
+  if (note) {
+    note.textContent = voices.length === 0
+      ? 'この端末で使える英語の声が見つかりません。端末の音声設定で英語の声を追加すると選べます。'
+      : '声の種類は端末によって違います(性別は声の名前から判断しているため、合わないことがあります)。';
+  }
 }

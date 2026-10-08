@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css?v=2026-10-07b">
+<link rel="stylesheet" href="style.css?v=2026-10-08a">
 </head>
 <body>
 
@@ -117,11 +117,6 @@
           <input type="number" id="pronStartInput" class="vocab-start" min="1" inputmode="numeric" placeholder="空欄=前回の続き">
         </div>
         <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 このグループを10語ずつ聞く</button>
-        <div id="basicSection">
-        <p class="section-label" style="margin-top:20px;">基礎語(1語を標準速度で2回、間は2秒)</p>
-        <button id="basicPlayAllBtn" class="btn-primary practice-btn" disabled>▶ 基礎語を流し聞き</button>
-        <div id="basicBlockGrid" class="basic-block-grid"></div>
-        </div>
       </div>
 
       <div class="card">
@@ -170,7 +165,14 @@
         <p class="section-label">テストの出題形式</p>
         <div class="chip-group" id="vocabTestFormChips"></div>
         <p class="section-label">読み上げ速度: <span id="vocabSpeedLabel">1.00倍</span></p>
-        <input type="range" id="vocabSpeedInput" min="0.6" max="1.2" step="0.05" value="1" class="vocab-speed">
+        <input type="range" id="vocabSpeedInput" min="0.6" max="1.25" step="0.05" value="1" class="vocab-speed">
+        <p class="memorize-note">この速度と声は、単語のカード・テスト・発音を聞くなど、アプリの音声すべてに使われます(リスニング過去問の速度は、正答率に応じて自動で変わります)。</p>
+        <p class="section-label">声</p>
+        <div class="vocab-voice-row">
+          <select id="vocabVoiceSelect" class="vocab-select"></select>
+          <button id="vocabVoiceTestBtn" class="btn-link">試し聞き</button>
+        </div>
+        <p id="vocabVoiceNote" class="memorize-note"></p>
         <p id="vocabSaveStatus" class="memorize-note"></p>
       </div>
 
@@ -255,29 +257,9 @@
         <button id="pronunciationRepeatBtn" class="btn-primary">🔁 繰り返し</button>
         <button id="pronunciationNextBtn" class="btn-primary">次へ ▶</button>
       </div>
-      <p class="section-label" style="margin-top:20px;">再生速度</p>
-      <div class="chip-group" id="pronunciationSpeedChips">
-        <button class="chip" data-value="0.75">0.75倍</button>
-        <button class="chip selected" data-value="1">標準</button>
-        <button class="chip" data-value="1.25">1.25倍</button>
-      </div>
     </div>
   </section>
 
-  <!-- 基礎語 流し聞き画面 -->
-  <section id="screen-basic" class="screen">
-    <header class="app-header">
-      <div id="basicProgress">0 / 0</div>
-      <button id="quitBasicBtn" class="btn-link">中断</button>
-    </header>
-    <div class="card pronunciation-card">
-      <p class="section-label" id="basicBlockLabel"></p>
-      <p class="pronunciation-word" id="basicEnglish"></p>
-      <p class="pronunciation-katakana" id="basicKatakana"></p>
-      <p class="pronunciation-japanese" id="basicJapanese"></p>
-      <p class="section-label" id="basicPass"></p>
-    </div>
-  </section>
 
   <!-- 単語: 覚えるカード -->
   <section id="screen-vcards" class="screen">
@@ -329,7 +311,7 @@
 
 </div>
 
-<script src="app.js?v=2026-10-07b"></script>
-  <script src="vocab.js?v=2026-10-07b"></script>
+<script src="app.js?v=2026-10-08a"></script>
+  <script src="vocab.js?v=2026-10-08a"></script>
 </body>
 </html>

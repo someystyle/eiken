@@ -504,3 +504,14 @@ input[type="text"] {
 
 .vocab-voice-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .vocab-select { flex: 1; min-width: 0; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+
+/* 単語: ボタン同士がくっつかないよう間隔を空ける */
+#vocabStartBtn { margin: 16px 0 8px; }
+#vocabCard .practice-btn { margin-top: 10px; }
+.vocab-t1900-box { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); }
+.vlegend-list { list-style: none; padding: 0; margin: 6px 0 12px; font-size: 13px; line-height: 1.7; }
+.vlegend-list li { margin-bottom: 4px; }
+.vsw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+.stats-note { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: #556; }
+.stats-note li { margin-bottom: 4px; }

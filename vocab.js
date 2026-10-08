@@ -4,7 +4,7 @@
 const vstate = {
   settings: null,
   overview: null,
-  scope: 't1900', // 't1900' | 'kakomon' | 'ss' | 'jun1' | 'teap' | 'v8' | 'v8opt'
+  scope: 't1900', // 't1900' | 'kakomon' | 'jun1' | 'teap' | 'v8' | 'v8opt'
   mode: 'learn', // 'learn' | 'test'
   cards: [],
   cardIndex: 0,
@@ -25,7 +25,7 @@ const VOCAB_SCOPES = [
   { key: 't1900', label: 'T1900', visible: function () { return true; } },
   { key: 'derived', label: 'T1900派生語', visible: function (s) { return s.derived; } },
   { key: 'kakomon', label: '過去問', visible: function (s) { return s.kakomon; } },
-  { key: 'ss', label: 'SS', visible: function (s) { return s.ss || s.v8; } },
+  { key: 'ss', label: 'SS', visible: function (s) { return s.v8; } },
   { key: 'v8', label: 'S・A・B', visible: function (s) { return s.v8; } },
   { key: 'v8opt', label: 'B3・D', visible: function (s) { return s.v8 && s.v8opt; } },
   { key: 'jun1', label: 'T1900準1級', visible: function (s) { return s.jun1; } },
@@ -45,7 +45,6 @@ const VOCAB_TEST_FORMS = [
 const VOCAB_SETTING_TOGGLES = [
   { key: 'derived', label: 'T1900派生語を含む' },
   { key: 'kakomon', label: '過去問の語を含む' },
-  { key: 'ss', label: '外部ソースSSランクを含む' },
   { key: 'jun1', label: 'T1900英検準1級を含む' },
   { key: 'teap', label: 'T1900TEAPを含む' },
   { key: 'v8', label: '外部ソースSS・S・A・Bランク(v8語彙)を含む' },
@@ -593,8 +592,12 @@ function renderVocabOverview_() {
   const o = vstate.overview;
   const notice = document.getElementById('vocabNotice');
   notice.style.display = o.needT1900Check ? '' : 'none';
+  document.getElementById('vocabNoticeText').textContent = o.needT1900Check
+    ? 'T1900を最後にテストしてから' + o.daysSinceT1900 + '日たちました。忘れていないか確認しましょう。'
+    : '';
 
   let html = '<p class="section-label">段階は上から順に進みます。前の段階の累計習得率が' + o.gateRate + '%になると次が解放されます(目標は' + o.goalRate + '%)。' +
+    '「習得」は今習得している語の割合、「累計」は一度でも習得した語(習得切れを含む)の割合です。' +
     (o.examNear ? '試験日が近いため、現在はすべて解放されています。' : '') + '</p><div class="vstage-grid">';
   o.stages.forEach(function (s) {
     if (s.enabled && s.total === 0) return; // 該当する語がない段階は出さない
@@ -613,9 +616,13 @@ function renderVocabOverview_() {
     html += '</div>';
   });
   html += '</div>';
-  html += '<p class="section-label">全体カバー率(対象の語のうち習得した割合): <b>' + o.coverage + '%</b></p>';
   html += '<p class="section-label">T1900の到達番号(連続して習得できている最大の番号): <b>' + o.t1900.reach + '</b> / 1900</p>';
-  html += '<p class="section-label">T1900(100番ごと)  <span class="vlegend vl-m">習得</span><span class="vlegend vl-l">学習中</span><span class="vlegend vl-x">期限切れ</span><span class="vlegend vl-n">未</span></p>';
+  html += '<p class="section-label">T1900の100番ごとの色分け</p><ul class="vlegend-list">' +
+    '<li><span class="vsw vl-m"></span><b>習得</b> … 別々の日に2回続けて正解し、最後に正解してから30日以内の語</li>' +
+    '<li><span class="vsw vl-l"></span><b>学習中</b> … 一度は出会ったが、まだ習得になっていない語</li>' +
+    '<li><span class="vsw vl-x"></span><b>習得切れ</b> … 一度習得したが、最後に正解してから30日以上たった語(もう一度テストで正解すると、習得に戻ります)</li>' +
+    '<li><span class="vsw vl-n"></span><b>未</b> … まだ一度も出会っていない語</li></ul>';
+
   html += '<div class="vblocks">';
   o.t1900.blocks.forEach(function (b) {
     const n = b.to - b.from + 1;

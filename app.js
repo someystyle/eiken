@@ -24,7 +24,9 @@ const state = {
   isMockExam: false, // 5-3節: 月次模試を受験中かどうか
   mockTally: null, // 技能別の正解数/問題数 { Vocabulary: {correct,total}, Reading: {...}, Listening: {...} }
   pronunciationWords: [], // 発音再生機能の今回のバッチ(10語)
-  pronunciationIndex: 0
+  pronunciationIndex: 0,
+  radarMax: 'auto', // レーダーチャートの目盛り: 'auto' または 100 / 50 / 25 / 10(点)
+  lastSkillScores: []
 };
 
 // ---- 画面切替 ----
@@ -50,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-08a';
+const APP_VERSION = '2026-10-08c';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -90,7 +92,15 @@ window.addEventListener('DOMContentLoaded', function () {
   setupChipGroup('debugModeChips', function (val) { state.debugMode = val; });
   setupChipGroup('statsViewChips', function (val) {
     document.getElementById('statsBody').style.display = (val === 'numbers') ? '' : 'none';
+    document.getElementById('statsNote').style.display = (val === 'numbers') ? '' : 'none';
+    document.getElementById('statsIntro').style.display = (val === 'numbers') ? '' : 'none';
+    document.getElementById('statsTitle').textContent = (val === 'numbers') ? '全単語の進捗' : '5技能のバランス';
     document.getElementById('statsGraphBody').style.display = (val === 'graph') ? '' : 'none';
+    document.getElementById('radarZoomBox').style.display = (val === 'graph') ? '' : 'none';
+  });
+  setupChipGroup('radarZoomChips', function (val) {
+    state.radarMax = val;
+    document.getElementById('statsGraphBody').innerHTML = renderSkillRadarChart_(state.lastSkillScores || []);
   });
   setupHomeTabs();
 
@@ -286,6 +296,7 @@ function loadStats() {
     if (!res.ok) { body.textContent = '取得に失敗しました。'; skillBody.textContent = '取得に失敗しました。'; return; }
     body.innerHTML = renderStatsGrid(res.stats);
     const skillScores = res.stats.skillScores || [];
+    state.lastSkillScores = skillScores;
     skillBody.innerHTML = renderSkillScores(skillScores);
     document.getElementById('statsGraphBody').innerHTML = renderSkillRadarChart_(skillScores);
   }).catch(function () {
@@ -320,6 +331,16 @@ function renderSkillRadarChart_(skillScores) {
     };
   });
 
+  // 目盛り(外側の線が何点か)。点数が低い時期は、自動または手動で拡大して見やすくする。
+  const topValue = points.reduce(function (m, p) { return Math.max(m, p.value); }, 0);
+  const steps = [10, 20, 30, 50, 75, 100];
+  let scaleMax = 100;
+  if (state.radarMax === 'auto') {
+    scaleMax = steps.filter(function (s) { return s >= topValue * 1.2; })[0] || 100;
+  } else {
+    scaleMax = Number(state.radarMax) || 100;
+  }
+
   const size = 300, center = size / 2, maxRadius = 78;
   const angleStep = (Math.PI * 2) / points.length;
   const axisStart = -Math.PI / 2;
@@ -332,11 +353,17 @@ function renderSkillRadarChart_(skillScores) {
     };
   }
 
-  // 背景のグリッド線(25/50/75/100%の目安の五角形)
+  // 背景のグリッド線(目盛りの25/50/75/100%の五角形)
   const gridLevels = [0.25, 0.5, 0.75, 1];
   const gridPolygons = gridLevels.map(function (ratio) {
     const pts = points.map(function (_, i) { const c = coordAt(i, ratio); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
     return '<polygon points="' + pts + '" fill="none" stroke="#dde3dd" stroke-width="1"></polygon>';
+  }).join('');
+  // 各線が何点かを、上の軸に沿って小さく表示する
+  const ringLabels = gridLevels.map(function (ratio) {
+    const c = coordAt(0, ratio);
+    const v = Math.round(scaleMax * ratio * 10) / 10;
+    return '<text x="' + (c.x + 3).toFixed(1) + '" y="' + (c.y + 3).toFixed(1) + '" font-size="8" fill="#889">' + v + '</text>';
   }).join('');
 
   // 中心から各軸への線
@@ -345,8 +372,8 @@ function renderSkillRadarChart_(skillScores) {
     return '<line x1="' + center + '" y1="' + center + '" x2="' + c.x.toFixed(1) + '" y2="' + c.y.toFixed(1) + '" stroke="#dde3dd" stroke-width="1"></line>';
   }).join('');
 
-  // 実際の値を結ぶ五角形
-  const valuePts = points.map(function (p, i) { const c = coordAt(i, p.value / 100); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
+  // 実際の値を結ぶ五角形(目盛りを超える値は外周で止める)
+  const valuePts = points.map(function (p, i) { const c = coordAt(i, Math.min(1, p.value / scaleMax)); return c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
 
   // 軸ラベル(短縮技能名+点数を2行で。常にmiddle揃えなので左右にはみ出さない)
   const labels = points.map(function (p, i) {
@@ -360,11 +387,11 @@ function renderSkillRadarChart_(skillScores) {
   const weakest = points.slice().sort(function (a, b) { return a.value - b.value; })[0];
 
   return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart" style="overflow:visible;">' +
-    gridPolygons + axisLines +
+    gridPolygons + axisLines + ringLabels +
     '<polygon points="' + valuePts + '" fill="rgba(45,106,79,0.25)" stroke="#2d6a4f" stroke-width="2" stroke-linejoin="round"></polygon>' +
     labels +
     '</svg>' +
-    '<p class="graph-caption">今いちばん伸びしろがあるのは「' + weakest.label + '」です</p>';
+    '<p class="graph-caption">外側の線 = ' + scaleMax + '点(目盛りは上のボタンで拡大・縮小できます)<br>今いちばん伸びしろがあるのは「' + weakest.label + '」です</p>';
 }
 
 // ---- 休止期間 ----

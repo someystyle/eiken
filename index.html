@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css?v=2026-10-08a">
+<link rel="stylesheet" href="style.css?v=2026-10-08c">
 </head>
 <body>
 
@@ -60,8 +60,8 @@
       <div class="card" id="vocabCard">
         <h2>単語</h2>
         <div id="vocabNotice" class="vocab-notice" style="display:none;">
-          <span>T1900を確認しましょう</span>
-          <button id="vocabNoticeTestBtn" class="btn-link">T1900だけテスト</button>
+          <span id="vocabNoticeText">T1900を確認しましょう</span>
+          <button id="vocabNoticeTestBtn" class="btn-link">おまかせテストをする</button>
         </div>
         <p class="section-label">範囲</p>
         <div class="chip-group" id="vocabScopeChips"></div>
@@ -79,10 +79,12 @@
         <button id="vocabStartBtn" class="btn-primary">覚える</button>
         <p class="memorize-note" id="vocabTargetCount"></p>
         <p class="memorize-note">派生語は「覚える」のカードに常に表示されます。テストに出すのは、Settingで派生語をオンにした場合だけです。
-        <p class="section-label" style="margin-top:16px;">T1900</p>
-        <button id="vocabT1900RangeTestBtn" class="btn-primary practice-btn">T1900だけテスト(この範囲)</button>
-        <button id="vocabT1900AutoTestBtn" class="btn-primary practice-btn">T1900だけテスト(おまかせ・覚えた単語から)</button>
-        <button id="vocabReviewCardsBtn" class="btn-primary practice-btn">要復習だけ覚える</button>
+        <div class="vocab-t1900-box">
+          <p class="section-label">T1900だけで練習する</p>
+          <button id="vocabT1900RangeTestBtn" class="btn-primary practice-btn">T1900だけテスト(この範囲)</button>
+          <button id="vocabT1900AutoTestBtn" class="btn-primary practice-btn">T1900だけテスト(おまかせ・覚えた単語から)</button>
+          <button id="vocabReviewCardsBtn" class="btn-primary practice-btn">要復習だけ覚える</button>
+        </div>
       </div>
 
       <div class="card">
@@ -135,12 +137,29 @@
 
     <div class="home-tab-panel" data-tab-panel="data">
       <div class="card stats-card">
-        <h2>これまでの進捗</h2>
+        <h2 id="statsTitle">全単語の進捗</h2>
         <div class="chip-group" id="statsViewChips">
           <button class="chip selected" data-value="numbers">数字で見る</button>
           <button class="chip" data-value="graph">グラフで見る</button>
         </div>
+        <p id="statsIntro" class="section-label">これまでに勉強した単語全体の数字です。最初はT1900だけで、グループが解放されて学習した分も加わります。グループごとの進み具合は、下の「単語の進捗」で見ます。</p>
         <div id="statsBody" class="stats-grid">読み込み中...</div>
+        <ul id="statsNote" class="stats-note">
+          <li><b>累計学習語数</b> … カードの「覚えた/まだ」やテストで、一度でも出会った語の数。T1900の見出し語・派生語・過去問の語など、グループの区別なく全部の合計です。</li>
+          <li><b>克服した語</b> … いま習得している語の数(別々の日に2回続けて正解し、最後の正解から30日以内)。全グループの合計で、30日たつと減ることがあります。</li>
+          <li><b>弱点語</b> … 最近間違えて「要復習」になっている語、または誤答が多い語の数(全グループの合計)。</li>
+          <li><b>通算正答率</b> … 単語のテスト(今日のセッション・単語テスト・T1900テスト)の、これまでの全回答の正答率です。</li>
+        </ul>
+        <div id="radarZoomBox" style="display:none;">
+          <p class="section-label">グラフの目盛り(点数が低いときは拡大すると見やすくなります)</p>
+          <div class="chip-group" id="radarZoomChips">
+            <button class="chip selected" data-value="auto">自動</button>
+            <button class="chip" data-value="100">全体(100点)</button>
+            <button class="chip" data-value="50">50点まで</button>
+            <button class="chip" data-value="25">25点まで</button>
+            <button class="chip" data-value="10">10点まで</button>
+          </div>
+        </div>
         <div id="statsGraphBody" class="stats-graph-body" style="display:none;"></div>
       </div>
 
@@ -154,6 +173,12 @@
         <h2>技能別実力スコア</h2>
         <p class="section-label">合格ラインに向けた進み具合(下がることはありません)</p>
         <div id="skillScoreBody">読み込み中...</div>
+        <ul class="stats-note">
+          <li><b>ボキャブラリー</b> … 解放済みの段階の語のうち、いま習得している語の割合。最初はT1900見出し語だけで、派生語・過去問などが解放されると、その語も含めて計算します(語が増えるため、割合は一時的に下がりますが、表示は最高点のままです)。</li>
+          <li><b>リーディング・リスニング</b> … いま挑戦中の級の問題のうち、一度でも正解した問題の割合。</li>
+          <li><b>ライティング・スピーキング</b> … 取り組んだ課題の割合。</li>
+          <li>点数は、いったん上がると下がりません(これまでの最高点を表示)。</li>
+        </ul>
       </div>
     </div>
 
@@ -311,7 +336,7 @@
 
 </div>
 
-<script src="app.js?v=2026-10-08a"></script>
-  <script src="vocab.js?v=2026-10-08a"></script>
+<script src="app.js?v=2026-10-08c"></script>
+  <script src="vocab.js?v=2026-10-08c"></script>
 </body>
 </html>

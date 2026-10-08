@@ -115,6 +115,7 @@ function setupVocab_() {
   });
   ['vocabRangeFrom', 'vocabRangeTo'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', saveVocabRange_);
+    document.getElementById(id).addEventListener('input', updateVocabRangeInfo_);
   });
 
   document.getElementById('vcardKnownBtn').addEventListener('click', function () { markVocabCard_(true); });
@@ -350,8 +351,29 @@ function renderVocabScope_() {
   fromEl.max = isT ? 1900 : 9999;
   toEl.max = isT ? 1900 : 9999;
   document.getElementById('vocabStartBtn').textContent = vstate.mode === 'learn' ? '覚える' : 'テストする';
-  document.getElementById('vocabTargetCount').textContent =
-    vstate.overview ? ('対象の語: ' + vstate.overview.targetCount + '語') : '';
+  updateVocabRangeInfo_();
+}
+
+// 選んだ範囲の語数と、Settingでオンにした全グループの合計語数を表示する
+function updateVocabRangeInfo_() {
+  const info = document.getElementById('vocabRangeInfo');
+  const totalEl = document.getElementById('vocabTargetCount');
+  if (!info || !vstate.settings) return;
+  const sc = VOCAB_SCOPES.filter(function (x) { return x.key === vstate.scope; })[0];
+  const total = vocabGroupTotal_(vstate.scope);
+  if (sc && total !== null) {
+    const from = Math.max(1, parseInt(document.getElementById('vocabRangeFrom').value, 10) || 1);
+    const toRaw = parseInt(document.getElementById('vocabRangeTo').value, 10) || (from + 99);
+    const to = Math.min(Math.max(from, toRaw), total);
+    const n = Math.max(0, to - from + 1);
+    info.textContent = '選んだ範囲: ' + sc.label + ' の ' + from.toLocaleString() + '〜' + to.toLocaleString() + (vstate.scope === 't1900' ? '番' : '番目') +
+      '(' + n.toLocaleString() + '語 / ' + sc.label + '全体 ' + total.toLocaleString() + '語)';
+  } else {
+    info.textContent = '';
+  }
+  totalEl.textContent = vstate.overview
+    ? 'Settingでオンにした全グループの合計: ' + Number(vstate.overview.targetCount).toLocaleString() + '語(選んだ範囲とは関係なく、対象になっている語の総数です)'
+    : '';
 }
 
 function startVocabFromScope_() {

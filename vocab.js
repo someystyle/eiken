@@ -593,7 +593,9 @@ function renderVocabOverview_() {
   const notice = document.getElementById('vocabNotice');
   notice.style.display = o.needT1900Check ? '' : 'none';
   document.getElementById('vocabNoticeText').textContent = o.needT1900Check
-    ? 'T1900を最後にテストしてから' + o.daysSinceT1900 + '日たちました。忘れていないか確認しましょう。'
+    ? (typeof o.daysSinceT1900 === 'number'
+      ? 'T1900を最後にテストしてから' + o.daysSinceT1900 + '日たちました。忘れていないか確認しましょう。'
+      : 'T1900を最後にテストしてから、しばらくたちました。忘れていないか確認しましょう。')
     : '';
 
   let html = '<p class="section-label">段階は上から順に進みます。前の段階の累計習得率が' + o.gateRate + '%になると次が解放されます(目標は' + o.goalRate + '%)。' +

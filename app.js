@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-08c';
+const APP_VERSION = '2026-10-08d';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });

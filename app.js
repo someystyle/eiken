@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-11c';
+const APP_VERSION = '2026-10-11d';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -801,16 +801,20 @@ function escapeHtml_(str) {
 // ---- Reading過去問カード (4-2節・6-3節) ----
 function renderReadingCard(q) {
   const card = document.getElementById('quizCard');
-  const isBlank = q.sectionType === '空所補充';
+  const isConv = q.sectionType === '会話文完成';
+  const isBlank = q.sectionType === '空所補充' || isConv;
+  // 会話文完成の古いデータは空所に番号が無い「(     )」のことがある
+  const numbered = !!q.blankNumber && new RegExp('\\(\\s*' + q.blankNumber + '\\s*\\)').test(q.passage || '');
   const instruction = isBlank
-    ? ('英文中の網掛けの( ' + q.blankNumber + ' )に入れるのに最も適切なものを選んでください')
+    ? ((isConv ? '会話文中の網掛けの' : '英文中の網掛けの') + (numbered ? '( ' + q.blankNumber + ' )' : '( )') +
+      'に入れるのに最も適切なものを選んでください')
     : (q.questionText ? escapeHtml_(q.questionText) : '内容に最も合うものを選んでください');
 
   let passageHtml = escapeHtml_(q.passage);
-  if (isBlank && q.blankNumber) {
+  if (isBlank) {
     // 同じパッセージに複数の空所番号があるため、「今どの番号を答えているか」を
     // 網掛け表示で示す(付けないと(18)(19)(20)のどれに回答しているか分からなくなるため)
-    const pattern = new RegExp('\\(\\s*' + q.blankNumber + '\\s*\\)');
+    const pattern = numbered ? new RegExp('\\(\\s*' + q.blankNumber + '\\s*\\)') : /\(\s+\)/;
     passageHtml = passageHtml.replace(pattern, function (match) {
       return '<mark class="reading-blank">' + match + '</mark>';
     });

@@ -24,6 +24,7 @@ const vstate = {
 const VOCAB_SCOPES = [
   { key: 't1900', label: 'T1900', visible: function () { return true; } },
   { key: 'derived', label: 'T1900派生語', visible: function (s) { return s.derived; } },
+  { key: 'idiom', label: '熟語', visible: function (s) { return s.idiom; } },
   { key: 'kakomon', label: '過去問', visible: function (s) { return s.kakomon; } },
   { key: 'ss', label: 'SS', visible: function (s) { return s.v8; } },
   { key: 'v8', label: 'S・A・B', visible: function (s) { return s.v8; } },
@@ -44,6 +45,7 @@ const VOCAB_TEST_FORMS = [
 
 const VOCAB_SETTING_TOGGLES = [
   { key: 'derived', label: 'T1900派生語を含む' },
+  { key: 'idiom', label: '熟語を含む(過去問に出た熟語から。T1900と並行して進みます)' },
   { key: 'kakomon', label: '過去問の語を含む' },
   { key: 'jun1', label: 'T1900英検準1級を含む' },
   { key: 'teap', label: 'T1900TEAPを含む' },
@@ -95,6 +97,9 @@ function setupVocab_() {
     renderVocabScope_();
   });
   document.getElementById('vocabStartBtn').addEventListener('click', startVocabFromScope_);
+  document.getElementById('daimon1StartBtn').addEventListener('click', function () {
+    startDaimon1_(document.getElementById('daimon1RoundSelect').value);
+  });
   document.getElementById('vocabSpeedInput').addEventListener('input', onVocabSettingChanged_);
   document.getElementById('vocabVoiceSelect').addEventListener('change', onVocabSettingChanged_);
   document.getElementById('vocabVoiceTestBtn').addEventListener('click', function () {
@@ -126,7 +131,8 @@ function setupVocab_() {
   document.getElementById('quitVtestBtn').addEventListener('click', function () { stopSpeech_(); leaveVocabScreen_(); });
   document.getElementById('vresultHomeBtn').addEventListener('click', leaveVocabScreen_);
   document.getElementById('vresultRetryBtn').addEventListener('click', function () {
-    if (vstate.test && vstate.test.params) startVocabTest_(vstate.test.params, vstate.test.isT1900);
+    if (vstate.test && vstate.test.isDaimon1) startDaimon1_(vstate.test.params.daimon1Round);
+    else if (vstate.test && vstate.test.params) startVocabTest_(vstate.test.params, vstate.test.isT1900);
   });
   setupVcardSwipe_();
 }
@@ -153,6 +159,7 @@ function loadVocabHome_() {
     renderVocabScope_();
     renderPronGroups_();
     renderVocabOverview_();
+    renderDaimon1Box_();
   }).catch(function () { /* 単語以外の機能は使えるようにする */ });
 }
 
@@ -503,6 +510,48 @@ function startVocabTest_(params, isT1900) {
   }).catch(function () { body.innerHTML = '<p class="memorize-note">通信に失敗しました。</p>'; });
 }
 
+// ---- 過去問 大問1(短文の語句空所補充) ----
+function renderDaimon1Box_() {
+  const d = vstate.overview && vstate.overview.daimon1;
+  const box = document.getElementById('daimon1Box');
+  if (!box) return;
+  if (!d || !d.total) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const sel = document.getElementById('daimon1RoundSelect');
+  const keep = sel.value;
+  sel.innerHTML = '';
+  const add = function (value, text) { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); };
+  add('', 'おまかせ10問(まだ解いていない問題・間違えた問題から)');
+  d.rounds.forEach(function (r) { add(r, r + '(全問を本番の順番で)'); });
+  if (keep && d.rounds.indexOf(keep) >= 0) sel.value = keep;
+  document.getElementById('daimon1Info').textContent = '全' + d.total + '問(2級の過去問)・解いた問題 ' + d.answered + '問' +
+    (d.accuracy === null ? '' : '・正答率 ' + d.accuracy + '%');
+}
+
+function startDaimon1_(round) {
+  showScreen('screen-vtest');
+  const body = document.getElementById('vtestBody');
+  body.innerHTML = '<p class="memorize-note">出題中...</p>';
+  document.getElementById('vtestProgress').textContent = '';
+  callApi('getDaimon1', { token: state.token, round: round || '', count: 10 }).then(function (res) {
+    if (!res.ok || !res.questions || res.questions.length === 0) {
+      body.innerHTML = '<p class="memorize-note">大問1の問題がまだ登録されていません。</p>';
+      return;
+    }
+    const qs = res.questions.map(function (x) {
+      return {
+        daimon1: true, vocabId: x.id, round: x.round, number: x.number, text: x.text,
+        choices: x.choices.map(function (t, i) { return { id: i + 1, text: t }; })
+      };
+    });
+    vstate.test = {
+      params: { daimon1Round: round || '' }, isDaimon1: true, queue: qs.slice(), index: 0,
+      total: qs.length, firstTry: {}, wrong: [], retried: {}, answered: false
+    };
+    renderVocabQuestion_();
+  }).catch(function () { body.innerHTML = '<p class="memorize-note">通信に失敗しました。</p>'; });
+}
+
 function renderVocabQuestion_() {
   const t = vstate.test;
   const q = t.queue[t.index];
@@ -510,7 +559,11 @@ function renderVocabQuestion_() {
   t.shownAt = Date.now();
   document.getElementById('vtestProgress').textContent = (t.index + 1) + ' / ' + t.queue.length;
   let html = '';
-  if (q.form === 'en2ja') {
+  if (q.daimon1) {
+    html += '<p class="section-label">過去問 大問1 ' + escapeHtml_(q.round) + ' (' + q.number + ')</p>' +
+      '<div class="daimon1-text">' + escapeHtml_(q.text).replace(/\(\s+\)/g, '( <span class="d1-blank"></span> )').replace(/\n/g, '<br>') + '</div>' +
+      '<p class="quiz-instruction">(   )に入れるのに最も適切なものを選んでください</p>';
+  } else if (q.form === 'en2ja') {
     html += '<div class="vword vword-big"><div class="vword-en">' + escapeHtml_(q.prompt) +
       (vocabSoundOn_() ? ' <button class="vspeak-btn" data-say="' + escapeHtml_(q.english) + '" aria-label="発音を聞く">🔊</button>' : '') + '</div>' +
       (q.phonetic ? '<div class="vword-ph">' + escapeHtml_(q.phonetic) + '</div>' : '') +
@@ -547,10 +600,15 @@ function onVocabChoose_(q, choice, btn) {
   t.answered = true;
   document.querySelectorAll('#vtestChoices .choice-btn').forEach(function (b) { b.disabled = true; });
   const elapsed = Math.round((Date.now() - t.shownAt) / 1000);
-  callApi('submitVocabAnswer', {
-    token: state.token, vocabId: q.vocabId, selectedId: choice.id, form: q.form,
-    kind: t.isT1900 ? 't1900' : 'normal', elapsedSec: elapsed
-  }).then(function (res) {
+  const request = q.daimon1
+    ? callApi('submitDaimon1Answer', { token: state.token, id: q.vocabId, selected: choice.id, elapsedSec: elapsed }).then(function (r) {
+      return r.ok ? { ok: true, correct: r.correct, answer: { id: r.answer, english: r.answerText, meaning: q.round + ' (' + q.number + ')' } } : r;
+    })
+    : callApi('submitVocabAnswer', {
+      token: state.token, vocabId: q.vocabId, selectedId: choice.id, form: q.form,
+      kind: t.isT1900 ? 't1900' : 'normal', elapsedSec: elapsed
+    });
+  request.then(function (res) {
     if (!res.ok) { document.getElementById('vtestFeedback').textContent = '記録に失敗しました。'; showVocabNext_(); return; }
     const correctChoiceId = res.answer.id;
     document.querySelectorAll('#vtestChoices .choice-btn').forEach(function (b, i) {
@@ -573,7 +631,7 @@ function onVocabChoose_(q, choice, btn) {
         t.queue.push(q);
         document.getElementById('vtestProgress').textContent = (t.index + 1) + ' / ' + t.queue.length;
       }
-      if (vocabSoundOn_()) vocabSpeakDelayed_(res.answer.english);
+      if (vocabSoundOn_() && !q.daimon1) vocabSpeakDelayed_(res.answer.english);
       showVocabNext_();
     }
   }).catch(function () {
@@ -602,7 +660,7 @@ function showVocabResult_() {
   const pct = ids.length > 0 ? Math.round(correct / ids.length * 100) : 0;
   let html = '<p class="result-score">' + pct + '%</p><p class="memorize-note">' + correct + ' / ' + ids.length + ' 問正解(最初の回答で判定)</p>';
   if (t.wrong.length > 0) {
-    html += '<p class="section-label">間違えた語</p><ul class="vwrong-list">' +
+    html += '<p class="section-label">' + (t.isDaimon1 ? '間違えた問題(正解)' : '間違えた語') + '</p><ul class="vwrong-list">' +
       t.wrong.map(function (w) { return '<li><b>' + escapeHtml_(w.english) + '</b> ' + escapeHtml_(w.meaning) + '</li>'; }).join('') + '</ul>';
   }
   document.getElementById('vresultBody').innerHTML = html;
@@ -658,6 +716,10 @@ function renderVocabOverview_() {
   });
   html += '</div>';
   html += '<p class="section-label">今週のテスト数: <b>' + o.weekTests + '</b> 問 / 連続学習日数: <b>' + o.streakDays + '</b> 日</p>';
+  if (o.daimon1 && o.daimon1.total) {
+    html += '<p class="section-label">過去問 大問1(短文の語句空所補充): 解いた問題 <b>' + o.daimon1.answered + '</b> / 全' + o.daimon1.total + '問' +
+      (o.daimon1.accuracy === null ? '' : '、正答率 <b>' + o.daimon1.accuracy + '%</b>') + '</p>';
+  }
   if (o.weakWords.length > 0) {
     html += '<p class="section-label">弱点語(誤答が多い語)</p><ul class="vwrong-list">' +
       o.weakWords.map(function (w) { return '<li><b>' + escapeHtml_(w.english) + '</b> ' + escapeHtml_(w.meaning) + '(×' + w.wrong + ')</li>'; }).join('') + '</ul>';

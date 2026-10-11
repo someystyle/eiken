@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css?v=2026-10-08e">
+<link rel="stylesheet" href="style.css?v=2026-10-11a">
 </head>
 <body>
 
@@ -80,6 +80,12 @@
         <button id="vocabStartBtn" class="btn-primary">覚える</button>
         <p class="memorize-note" id="vocabTargetCount"></p>
         <p class="memorize-note">派生語は「覚える」のカードに常に表示されます。テストに出すのは、Settingで派生語をオンにした場合だけです。</p>
+        <div class="vocab-t1900-box" id="daimon1Box" style="display:none;">
+          <p class="section-label">過去問 大問1(短文の語句空所補充・本番と同じ形式)</p>
+          <select id="daimon1RoundSelect" class="vocab-select"></select>
+          <button id="daimon1StartBtn" class="btn-primary practice-btn">大問1を解く</button>
+          <p class="memorize-note" id="daimon1Info"></p>
+        </div>
         <div class="vocab-t1900-box">
           <p class="section-label">T1900だけで練習する</p>
           <button id="vocabT1900RangeTestBtn" class="btn-primary practice-btn">T1900だけテスト(この範囲)</button>
@@ -337,7 +343,7 @@
 
 </div>
 
-<script src="app.js?v=2026-10-08e"></script>
-  <script src="vocab.js?v=2026-10-08e"></script>
+<script src="app.js?v=2026-10-11a"></script>
+  <script src="vocab.js?v=2026-10-11a"></script>
 </body>
 </html>

@@ -98,7 +98,11 @@ function setupVocab_() {
   });
   document.getElementById('vocabStartBtn').addEventListener('click', startVocabFromScope_);
   document.getElementById('daimon1StartBtn').addEventListener('click', function () {
-    startDaimon1_(document.getElementById('daimon1RoundSelect').value);
+    startDaimon1_(document.getElementById('daimon1RoundSelect').value, document.getElementById('daimon1GradeSelect').value);
+  });
+  document.getElementById('daimon1GradeSelect').addEventListener('change', function () {
+    vstate.daimon1Grade = this.value;
+    renderDaimon1Box_();
   });
   document.getElementById('vocabSpeedInput').addEventListener('input', onVocabSettingChanged_);
   document.getElementById('vocabVoiceSelect').addEventListener('change', onVocabSettingChanged_);
@@ -131,7 +135,7 @@ function setupVocab_() {
   document.getElementById('quitVtestBtn').addEventListener('click', function () { stopSpeech_(); leaveVocabScreen_(); });
   document.getElementById('vresultHomeBtn').addEventListener('click', leaveVocabScreen_);
   document.getElementById('vresultRetryBtn').addEventListener('click', function () {
-    if (vstate.test && vstate.test.isDaimon1) startDaimon1_(vstate.test.params.daimon1Round);
+    if (vstate.test && vstate.test.isDaimon1) startDaimon1_(vstate.test.params.daimon1Round, vstate.test.params.daimon1Grade);
     else if (vstate.test && vstate.test.params) startVocabTest_(vstate.test.params, vstate.test.isT1900);
   });
   setupVcardSwipe_();
@@ -511,12 +515,30 @@ function startVocabTest_(params, isT1900) {
 }
 
 // ---- 過去問 大問1(短文の語句空所補充) ----
+// 表示中の級の大問1の集計(古いサーバーは grades が無く、2級だけを返す)
+function currentDaimon1_() {
+  const o = vstate.overview && vstate.overview.daimon1;
+  if (!o) return null;
+  const grades = o.grades || [o];
+  const want = vstate.daimon1Grade || o.defaultGrade;
+  return grades.find(function (g) { return g.grade === want; }) || grades[0] || null;
+}
+
 function renderDaimon1Box_() {
-  const d = vstate.overview && vstate.overview.daimon1;
+  const o = vstate.overview && vstate.overview.daimon1;
+  const d = currentDaimon1_();
   const box = document.getElementById('daimon1Box');
   if (!box) return;
   if (!d || !d.total) { box.style.display = 'none'; return; }
   box.style.display = '';
+  const gsel = document.getElementById('daimon1GradeSelect');
+  const grades = (o.grades || []).filter(function (g) { return g.total > 0; });
+  gsel.innerHTML = '';
+  grades.forEach(function (g) {
+    const op = document.createElement('option'); op.value = g.grade; op.textContent = g.grade + 'の過去問'; gsel.appendChild(op);
+  });
+  gsel.value = d.grade || '';
+  gsel.style.display = grades.length > 1 ? '' : 'none';
   const sel = document.getElementById('daimon1RoundSelect');
   const keep = sel.value;
   sel.innerHTML = '';
@@ -524,16 +546,17 @@ function renderDaimon1Box_() {
   add('', 'おまかせ10問(まだ解いていない問題・間違えた問題から)');
   d.rounds.forEach(function (r) { add(r, r + '(全問を本番の順番で)'); });
   if (keep && d.rounds.indexOf(keep) >= 0) sel.value = keep;
-  document.getElementById('daimon1Info').textContent = '全' + d.total + '問(2級の過去問)・解いた問題 ' + d.answered + '問' +
+  document.getElementById('daimon1Info').textContent = '全' + d.total + '問(' + (d.grade || '2級') + 'の過去問)・解いた問題 ' + d.answered + '問' +
     (d.accuracy === null ? '' : '・正答率 ' + d.accuracy + '%');
 }
 
-function startDaimon1_(round) {
+function startDaimon1_(round, grade) {
+  grade = grade || (currentDaimon1_() && currentDaimon1_().grade) || '2級';
   showScreen('screen-vtest');
   const body = document.getElementById('vtestBody');
   body.innerHTML = '<p class="memorize-note">出題中...</p>';
   document.getElementById('vtestProgress').textContent = '';
-  callApi('getDaimon1', { token: state.token, round: round || '', count: 10 }).then(function (res) {
+  callApi('getDaimon1', { token: state.token, grade: grade, round: round || '', count: 10 }).then(function (res) {
     if (!res.ok || !res.questions || res.questions.length === 0) {
       body.innerHTML = '<p class="memorize-note">大問1の問題がまだ登録されていません。</p>';
       return;
@@ -545,7 +568,7 @@ function startDaimon1_(round) {
       };
     });
     vstate.test = {
-      params: { daimon1Round: round || '' }, isDaimon1: true, queue: qs.slice(), index: 0,
+      params: { daimon1Round: round || '', daimon1Grade: grade }, isDaimon1: true, queue: qs.slice(), index: 0,
       total: qs.length, firstTry: {}, wrong: [], retried: {}, answered: false
     };
     renderVocabQuestion_();
@@ -725,9 +748,12 @@ function renderVocabOverview_() {
   });
   html += '</div>';
   html += '<p class="section-label">今週のテスト数: <b>' + o.weekTests + '</b> 問 / 連続学習日数: <b>' + o.streakDays + '</b> 日</p>';
-  if (o.daimon1 && o.daimon1.total) {
-    html += '<p class="section-label">過去問 大問1(短文の語句空所補充): 解いた問題 <b>' + o.daimon1.answered + '</b> / 全' + o.daimon1.total + '問' +
-      (o.daimon1.accuracy === null ? '' : '、正答率 <b>' + o.daimon1.accuracy + '%</b>') + '</p>';
+  if (o.daimon1) {
+    (o.daimon1.grades || [o.daimon1]).forEach(function (g) {
+      if (!g.total) return;
+      html += '<p class="section-label">過去問 大問1(' + (g.grade || '2級') + '): 解いた問題 <b>' + g.answered + '</b> / 全' + g.total + '問' +
+        (g.accuracy === null ? '' : '、正答率 <b>' + g.accuracy + '%</b>') + '</p>';
+    });
   }
   if (o.weakWords.length > 0) {
     html += '<p class="section-label">弱点語(誤答が多い語)</p><ul class="vwrong-list">' +

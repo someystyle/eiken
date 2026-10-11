@@ -518,3 +518,19 @@ input[type="text"] {
 
 .daimon1-text { font-size: 18px; line-height: 1.7; margin: 8px 0 4px; padding: 12px; background: #f6f8f6; border-radius: 10px; }
 .d1-blank { display: inline-block; width: 4em; border-bottom: 2px solid #2d6a4f; vertical-align: baseline; }
+
+/* Writing補助(書く型・語数・ストップウォッチ・自己チェック・模範解答・書き直し) */
+.writing-help { margin: 8px 0; }
+.writing-stopwatch { font-size: 13px; color: var(--muted); text-align: right; margin: 0 0 6px; }
+.writing-details { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 14px; }
+.writing-details summary { cursor: pointer; font-weight: 600; }
+.writing-list { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
+.writing-checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; line-height: 1.5; }
+.writing-checklist input { margin-right: 6px; }
+.word-count { font-size: 13px; color: var(--muted); margin: -8px 0 12px; }
+.wc-ok { color: var(--primary); font-weight: 700; }
+.wc-under { color: #b07a00; font-weight: 700; }
+.wc-over { color: #c0392b; font-weight: 700; }
+.model-answer { border-left: 4px solid var(--primary); background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.7; font-size: 15px; }
+.model-answer .section-label { margin-top: 0; }
+.due-today { font-size: 14px; background: rgba(45,106,79,0.08); border-radius: 8px; padding: 8px 12px; margin: 0 0 8px; line-height: 1.6; }

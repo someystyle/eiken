@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-11a';
+const APP_VERSION = '2026-10-11b';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -1111,6 +1111,7 @@ function startPractice(skill) {
 function renderPracticeCard(prompt) {
   const card = document.getElementById('practiceCard');
   const hasUrl = !!prompt.notebooklmUrl;
+  const isWriting = prompt.skill === 'Writing';
 
   card.innerHTML =
     '<p class="reading-label">' + escapeHtml_(prompt.skill + '・' + prompt.promptType) + '</p>' +
@@ -1118,7 +1119,9 @@ function renderPracticeCard(prompt) {
     '<p class="practice-step-label">① 課題に取り組む</p>' +
     '<p class="practice-instruction">' + escapeHtml_(prompt.instruction || '課題に取り組んでください。') + '</p>' +
     '<div class="reading-passage">' + escapeHtml_(prompt.task).replace(/\n/g, '<br>') + '</div>' +
+    (isWriting ? renderWritingHelpHtml_(prompt) : '') +
     '<textarea id="answerInput" class="answer-textarea" placeholder="ここに解答を書いてください(Speakingの場合は話した内容を書き起こしてください)" rows="6"></textarea>' +
+    (isWriting ? '<p id="answerWordCount" class="word-count"></p>' + renderWritingChecklistHtml_(prompt) : '') +
 
     (prompt.skill === 'Speaking' ? renderSpeakingPracticeBoxHtml_(prompt) : '') +
 
@@ -1133,6 +1136,7 @@ function renderPracticeCard(prompt) {
     (hasUrl ? '先に②のボタンでAIコーチに相談してください' : 'NotebookLMからのフィードバックで、各項目が何点だったか入力してください(0〜4点)') +
     '</p>' +
     '<div id="axisScoreForm" class="axis-score-form"></div>' +
+    (isWriting ? renderWritingRewriteHtml_(prompt, hasUrl) : '') +
     '<button id="submitPracticeBtn" class="btn-primary" disabled>記録する</button>' +
     '<p id="practiceFeedback" class="feedback-text"></p>';
 
@@ -1173,6 +1177,9 @@ function renderPracticeCard(prompt) {
   if (prompt.skill === 'Speaking') {
     setupSpeakingPracticeBox_(prompt);
   }
+  if (isWriting) {
+    setupWritingHelp_(prompt);
+  }
 
   if (hasUrl) {
     document.getElementById('notebookBtn').addEventListener('click', function () {
@@ -1187,6 +1194,7 @@ function renderPracticeCard(prompt) {
       }
       copyToClipboard_(message);
       window.open(prompt.notebooklmUrl, '_blank');
+      if (isWriting) stopWritingStopwatch_(); // 書き終えた時点の時間を残す
       // AIコーチに相談したら、点数入力欄を使えるようにする
       document.querySelectorAll('#axisScoreForm .score-chip').forEach(function (b) { b.disabled = false; });
       document.getElementById('axisInstruction').textContent = 'NotebookLMからのフィードバックで、各項目が何点だったか入力してください(0〜4点)';
@@ -1196,6 +1204,121 @@ function renderPracticeCard(prompt) {
   state.practiceStartTime = Date.now();
 }
 
+// ---- Writing補助: 書く型・語数カウンター・ストップウォッチ・自己チェック・模範解答・書き直し ----
+let writingStopwatchTimer_ = null;
+
+// 英検の数え方に近い語数(I'm, well-known は1語。数字も1語)
+function countEnglishWords_(text) {
+  const m = String(text || '').match(/[A-Za-z0-9]+(?:['’\-][A-Za-z0-9]+)*/g);
+  return m ? m.length : 0;
+}
+
+function wordCountHtml_(n, range) {
+  if (!range) return '語数: ' + n + '語';
+  let cls = 'ok', note = '目安の範囲内';
+  if (n < range[0]) { cls = 'under'; note = 'あと' + (range[0] - n) + '語'; }
+  else if (n > range[1]) { cls = 'over'; note = range[1] + '語を' + (n - range[1]) + '語こえています'; }
+  if (n === 0) { cls = ''; note = ''; }
+  return '語数: <span class="wc-' + cls + '">' + n + '語</span>(目安 ' + range[0] + '〜' + range[1] + '語)' +
+    (note ? ' <span class="wc-' + cls + '">' + note + '</span>' : '');
+}
+
+function renderWritingHelpHtml_(prompt) {
+  const tpl = prompt.template || [];
+  return '<div class="writing-help">' +
+    '<p id="writingStopwatch" class="writing-stopwatch">⏱ 経過 0:00</p>' +
+    (tpl.length > 0
+      ? '<details class="writing-details"><summary>📋 書く型(迷ったらこの順に書く)</summary><ol class="writing-list">' +
+        tpl.map(function (t) { return '<li>' + escapeHtml_(t) + '</li>'; }).join('') + '</ol></details>'
+      : '') +
+    '</div>';
+}
+
+function renderWritingChecklistHtml_(prompt) {
+  const items = prompt.checklist || [];
+  if (items.length === 0) return '';
+  return '<details class="writing-details"><summary>✅ 書き終えたら自己チェック</summary><div class="writing-checklist">' +
+    items.map(function (t) { return '<label><input type="checkbox"> ' + escapeHtml_(t) + '</label>'; }).join('') +
+    '</div></details>';
+}
+
+function renderWritingRewriteHtml_(prompt, hasUrl) {
+  return '<p class="practice-step-label">④ 模範解答と比べて書き直す(任意)</p>' +
+    (prompt.modelAnswer
+      ? '<button id="modelAnswerBtn" type="button" class="btn-primary listening-play-btn">📖 模範解答を見る</button>' +
+        '<div id="modelAnswerBox" class="model-answer" style="display:none;"></div>'
+      : '<p class="memorize-note">この課題の模範解答は登録されていません。</p>') +
+    '<p class="memorize-note">AIコーチのアドバイスと模範解答を参考に、①の解答を書き直してみましょう。</p>' +
+    '<button id="rewriteCopyBtn" type="button" class="btn-link">①の解答をコピーして書き始める</button>' +
+    '<textarea id="rewriteInput" class="answer-textarea" placeholder="書き直した解答" rows="6"></textarea>' +
+    '<p id="rewriteWordCount" class="word-count"></p>' +
+    (hasUrl
+      ? '<button id="rewriteNotebookBtn" type="button" class="btn-primary listening-play-btn">📋 書き直しをAIコーチに見てもらう</button>' +
+        '<p class="memorize-note">課題・1回目の解答・書き直した解答をまとめてコピーし、NotebookLMを開きます。</p>'
+      : '');
+}
+
+function stopWritingStopwatch_() {
+  if (writingStopwatchTimer_) { clearInterval(writingStopwatchTimer_); writingStopwatchTimer_ = null; }
+}
+
+function setupWritingHelp_(prompt) {
+  const range = prompt.wordRange || null;
+  const answerEl = document.getElementById('answerInput');
+  const countEl = document.getElementById('answerWordCount');
+  const rewriteEl = document.getElementById('rewriteInput');
+  const rewriteCountEl = document.getElementById('rewriteWordCount');
+  const updateCount = function () { countEl.innerHTML = wordCountHtml_(countEnglishWords_(answerEl.value), range); };
+  const updateRewriteCount = function () { rewriteCountEl.innerHTML = wordCountHtml_(countEnglishWords_(rewriteEl.value), range); };
+  answerEl.addEventListener('input', updateCount);
+  rewriteEl.addEventListener('input', updateRewriteCount);
+  updateCount();
+  updateRewriteCount();
+
+  // ストップウォッチ(本番は筆記全体で時間が決まっているので、1題にかかる時間を意識する)
+  stopWritingStopwatch_();
+  const swEl = document.getElementById('writingStopwatch');
+  const start = Date.now();
+  writingStopwatchTimer_ = setInterval(function () {
+    if (!document.body.contains(swEl)) { stopWritingStopwatch_(); return; }
+    const sec = Math.floor((Date.now() - start) / 1000);
+    swEl.textContent = '⏱ 経過 ' + Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2);
+  }, 1000);
+
+  const modelBtn = document.getElementById('modelAnswerBtn');
+  if (modelBtn) {
+    modelBtn.addEventListener('click', function () {
+      if (!answerEl.value.trim() && !confirm('まだ①の解答が書かれていません。先に自分で書いてから見るのがおすすめです。模範解答を表示しますか？')) return;
+      const box = document.getElementById('modelAnswerBox');
+      box.innerHTML = '<p class="section-label">模範解答(英検の解答例・' + countEnglishWords_(prompt.modelAnswer) + '語)</p>' +
+        '<p>' + escapeHtml_(prompt.modelAnswer).replace(/\n/g, '<br>') + '</p>';
+      box.style.display = '';
+      modelBtn.style.display = 'none';
+    });
+  }
+
+  document.getElementById('rewriteCopyBtn').addEventListener('click', function () {
+    if (!rewriteEl.value.trim() || confirm('書き直し欄の内容を、①の解答で置き換えますか？')) {
+      rewriteEl.value = answerEl.value;
+      updateRewriteCount();
+      rewriteEl.focus();
+    }
+  });
+
+  const reBtn = document.getElementById('rewriteNotebookBtn');
+  if (reBtn) {
+    reBtn.addEventListener('click', function () {
+      const first = answerEl.value.trim() || '(1回目の解答なし)';
+      const second = rewriteEl.value.trim() || '(書き直した解答なし)';
+      const message = '登録してあるWriting評価ルーブリックを使って、書き直した解答を' + (prompt.axes || []).join('・') +
+        'の観点ごとに採点してください。1回目と比べて良くなった点と、まだ直した方がよい点も教えてください。\n\n' +
+        '【課題】\n' + prompt.task + '\n\n【1回目の解答】\n' + first + '\n\n【書き直した解答】\n' + second;
+      copyToClipboard_(message);
+      window.open(prompt.notebooklmUrl, '_blank');
+    });
+  }
+}
+
 // ---- スピーキング補完練習 (機能B: 本番形式タイマー・回答テンプレート・自己録音・シャドーイング) ----
 // 正誤判定・採点は行わない自己練習ツール。①課題に取り組む欄と②AIコーチ相談欄の間に、
 // 任意で使える練習ブロックとして表示する(Speakingのみ)。
@@ -1203,6 +1326,7 @@ let speakingCountdownTimer_ = null;
 let speakingMediaRecorder_ = null;
 
 function stopSpeakingPracticeTimers_() {
+  stopWritingStopwatch_();
   if (speakingCountdownTimer_) { clearInterval(speakingCountdownTimer_); speakingCountdownTimer_ = null; }
   if (speakingMediaRecorder_ && speakingMediaRecorder_.state !== 'inactive') {
     try { speakingMediaRecorder_.stop(); } catch (e) { /* ignore */ }

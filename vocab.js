@@ -678,6 +678,15 @@ function renderVocabOverview_() {
       : 'T1900を最後にテストしてから、しばらくたちました。忘れていないか確認しましょう。')
     : '';
 
+  const dueEl = document.getElementById('dueTodayLine');
+  if (dueEl) {
+    const due = Number(o.dueToday) || 0;
+    dueEl.style.display = typeof o.dueToday === 'number' ? '' : 'none';
+    dueEl.innerHTML = due > 0
+      ? '🔁 今日の復習: <b>' + due + '語</b>(1日後・3日後・1週間後…と間隔をあけて復習する語。セッションで先に出題します)'
+      : '🔁 今日の復習はありません。新しい語に進みましょう。';
+  }
+
   let html = '<p class="section-label">段階は上から順に進みます。前の段階の累計習得率が' + o.gateRate + '%になると次が解放されます(目標は' + o.goalRate + '%)。' +
     '「習得」は今習得している語の割合、「累計」は一度でも習得した語(習得切れを含む)の割合です。' +
     (o.examNear ? '試験日が近いため、現在はすべて解放されています。' : '') + '</p><div class="vstage-grid">';

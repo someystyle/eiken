@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-12a';
+const APP_VERSION = '2026-10-12b';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -1090,13 +1090,60 @@ function renderListeningCard(q) {
 
 // ---- リスニングの再生: 本番の音声(Googleドライブの音声ファイルの、その問題の部分)を優先し、
 // 無い問題・再生できないときは端末の読み上げ(TTS)にする ----
-let listeningAudio_ = null;      // 再生に使う <audio>(音声ファイルごとに作り直す)
+// 音声ファイルは、アプリが通常の通信で端末に取り込んでから再生する(iPhoneの音声プレーヤーは、
+// 読み込み時にアプリのアドレスをGoogleへ伝えないことがあり、APIキーの制限で弾かれるため)。
+// 1つの部の音声ファイルを1回取り込めば、同じ部の問題はそれを使い回す(最近の2ファイルまで保持)。
+let listeningAudio_ = null;      // 再生に使う <audio>(1つを使い回す)
 let listeningAudioStop_ = null;  // 問題の終わりで止めるための監視
+let listeningAudioToken_ = 0;    // 新しく再生を始めたら、前の待ち(読み込み中など)を無効にする
+const listeningBlobCache_ = {};  // 音声ファイルURL → 取り込んだ音声(object URL)の Promise
+const LISTENING_BLOB_KEEP = 2;
+
+function listeningAudioEl_() {
+  if (!listeningAudio_) { listeningAudio_ = new Audio(); listeningAudio_.preload = 'auto'; }
+  return listeningAudio_;
+}
+
+// iPhoneでは、画面を押した瞬間に一度再生した <audio> でないと、後から再生できない。
+// 最初に画面を押したときに、無音を一度鳴らしておく。
+const LISTENING_SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+let listeningAudioUnlocked_ = false;
+function unlockListeningAudio_() {
+  if (listeningAudioUnlocked_) return;
+  listeningAudioUnlocked_ = true;
+  const a = listeningAudioEl_();
+  if (!a.src) a.src = LISTENING_SILENT_WAV;
+  try {
+    const p = a.play();
+    if (p && p.then) p.then(function () { if (a.src === LISTENING_SILENT_WAV) a.pause(); }).catch(function () { listeningAudioUnlocked_ = false; });
+  } catch (e) { listeningAudioUnlocked_ = false; }
+}
+document.addEventListener('touchend', unlockListeningAudio_, true);
+document.addEventListener('click', unlockListeningAudio_, true);
+
+function loadListeningBlob_(url) {
+  if (!listeningBlobCache_[url]) {
+    const keys = Object.keys(listeningBlobCache_);
+    if (keys.length >= LISTENING_BLOB_KEEP) { // 古いものを捨てる
+      const old = keys[0];
+      listeningBlobCache_[old].then(function (u) { URL.revokeObjectURL(u); }).catch(function () { /* ignore */ });
+      delete listeningBlobCache_[old];
+    }
+    const p = fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    }).then(function (b) { return URL.createObjectURL(b); });
+    listeningBlobCache_[url] = p;
+    p.catch(function () { if (listeningBlobCache_[url] === p) delete listeningBlobCache_[url]; });
+  }
+  return listeningBlobCache_[url];
+}
 
 function stopListeningAudio_() {
+  listeningAudioToken_++;
   if (listeningAudioStop_ && listeningAudio_) listeningAudio_.removeEventListener('timeupdate', listeningAudioStop_);
   listeningAudioStop_ = null;
-  if (listeningAudio_) { try { listeningAudio_.pause(); } catch (e) { /* ignore */ } }
+  if (listeningAudio_) { try { listeningAudio_.pause(); listeningAudio_.muted = false; } catch (e) { /* ignore */ } }
 }
 
 // 読み上げ用の文: 原稿の後に、英語の質問文があれば続けて読む(本番も質問が読まれるため)
@@ -1148,53 +1195,59 @@ function playListening_(q, speedRate) {
   const a = q.audio;
   if (!a || !a.url || q.audioFailed) return playListeningTts_(q, speedRate);
 
-  if (!listeningAudio_ || listeningAudio_.dataset.url !== a.url) {
-    stopListeningAudio_();
-    listeningAudio_ = new Audio();
-    listeningAudio_.preload = 'auto';
-    listeningAudio_.dataset.url = a.url;
-    listeningAudio_.src = a.url;
-  }
-  const audio = listeningAudio_;
-  let started = false;
+  const token = listeningAudioToken_;
+  const label = document.getElementById('listeningSource');
   const fail = function () {
-    if (started) return;
-    started = true;
+    if (token !== listeningAudioToken_) return; // 別の問題に移った・止めた
+    stopListeningAudio_();
     q.audioFailed = true; // この問題は以後、読み上げで再生する
     playListeningTts_(q, speedRate);
   };
-  const begin = function () {
-    if (started) return;
-    try {
-      audio.currentTime = a.start;
-      audio.playbackRate = speedRate || 1.0;
-      if ('preservesPitch' in audio) audio.preservesPitch = true;
-    } catch (e) { fail(); return; }
-    let checked = false;
-    listeningAudioStop_ = function () {
-      // 途中から再生できない(頭から流れてしまう)ときは、読み上げにする
-      if (!checked && audio.currentTime > 0) {
-        checked = true;
-        if (Math.abs(audio.currentTime - a.start) > 3) { stopListeningAudio_(); started = false; fail(); return; }
-      }
-      if (audio.currentTime >= a.end) stopListeningAudio_();
-    };
+  let loaded = false;
+  if (label) label.textContent = '🎧 本番の音声(読み込み中…)';
+  const timer = setTimeout(function () { if (!loaded) fail(); }, 60000); // 60秒たっても取り込めなければ読み上げにする
+
+  loadListeningBlob_(a.url).then(function (objUrl) {
+    loaded = true; clearTimeout(timer);
+    if (token !== listeningAudioToken_) return;
+    if (label) label.textContent = '🎧 本番の音声';
+    const audio = listeningAudioEl_();
+    audio.playbackRate = speedRate || 1.0;
+    if ('preservesPitch' in audio) audio.preservesPitch = true;
+    listeningAudioStop_ = function () { if (audio.currentTime >= a.end) stopListeningAudio_(); };
     audio.addEventListener('timeupdate', listeningAudioStop_);
+    const onPlayError = function (err) {
+      if (token !== listeningAudioToken_) return;
+      if (err && err.name === 'NotAllowedError') { // 自動再生が止められた: 再生ボタンを押せば流れる
+        stopListeningAudio_();
+        if (label) label.textContent = '🎧 本番の音声(「音声を再生」を押すと流れます)';
+        return;
+      }
+      fail();
+    };
+    if (audio.dataset.url === objUrl && audio.readyState >= 1) {
+      audio.currentTime = a.start;
+      const p = audio.play();
+      if (p && p.catch) p.catch(onPlayError);
+      return;
+    }
+    // 新しい音声ファイル: 消音で再生を始め、長さが分かったら問題の位置へ移ってから音を出す
+    // (iPhoneは再生を始めるまで読み込まないため、先に play() を呼ぶ)
+    audio.dataset.url = objUrl;
+    audio.muted = true;
+    audio.src = objUrl;
+    audio.addEventListener('loadedmetadata', function () {
+      if (token !== listeningAudioToken_) return;
+      audio.currentTime = a.start;
+      audio.addEventListener('seeked', function () { if (token === listeningAudioToken_) audio.muted = false; }, { once: true });
+    }, { once: true });
+    audio.addEventListener('error', function () { fail(); }, { once: true });
     const p = audio.play();
-    started = true;
-    if (p && p.catch) p.catch(function (err) {
-      // 自動再生がブラウザに止められた場合は、何もしない(再生ボタンを押せば本番の音声で流れる)
-      if (err && err.name === 'NotAllowedError') { stopListeningAudio_(); return; }
-      started = false; fail();
-    });
-  };
-  audio.addEventListener('error', fail, { once: true });
-  if (audio.readyState >= 1) begin();
-  else {
-    audio.addEventListener('loadedmetadata', begin, { once: true });
-    setTimeout(function () { if (!started) fail(); }, 15000); // 15秒たっても読み込めなければ読み上げにする
-    try { audio.load(); } catch (e) { /* ignore */ }
-  }
+    if (p && p.catch) p.catch(onPlayError);
+  }).catch(function () {
+    loaded = true; clearTimeout(timer);
+    fail();
+  });
   return true;
 }
 

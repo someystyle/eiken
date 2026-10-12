@@ -534,3 +534,22 @@ input[type="text"] {
 .model-answer { border-left: 4px solid var(--primary); background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.7; font-size: 15px; }
 .model-answer .section-label { margin-top: 0; }
 .due-today { font-size: 14px; background: rgba(45,106,79,0.08); border-radius: 8px; padding: 8px 12px; margin: 0 0 8px; line-height: 1.6; }
+
+/* 学習計画(今日の目安) */
+.plan-list { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+.plan-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.plan-row:last-child { border-bottom: none; }
+.plan-label { font-size: 14px; font-weight: 600; }
+.plan-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.plan-right { font-size: 14px; text-align: right; min-width: 120px; }
+.plan-bar { height: 6px; background: #e6ebe7; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.plan-bar-fill { height: 100%; background: #b07a00; }
+.plan-bar-fill.ok { background: var(--primary); }
+.plan-done { color: var(--primary); font-weight: 700; }
+.plan-behind { color: #c0392b; font-weight: 700; margin-left: 4px; }
+.plan-ahead { color: var(--primary); font-weight: 700; margin-left: 4px; }
+.plan-lag { font-size: 13px; color: #c0392b; background: rgba(192,57,43,0.06); border-radius: 8px; padding: 8px 12px; }
+.listening-source-label { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+
+/* 過去問 大問1: 選択欄が長い文字でスマホの枠からはみ出さないように、幅を枠に合わせる */
+#daimon1Box .vocab-select, #listeningBox .vocab-select { display: block; width: 100%; max-width: 100%; box-sizing: border-box; margin-bottom: 8px; text-overflow: ellipsis; }

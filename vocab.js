@@ -543,8 +543,8 @@ function renderDaimon1Box_() {
   const keep = sel.value;
   sel.innerHTML = '';
   const add = function (value, text) { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); };
-  add('', 'おまかせ10問(まだ解いていない問題・間違えた問題から)');
-  d.rounds.forEach(function (r) { add(r, r + '(全問を本番の順番で)'); });
+  add('', 'おまかせ10問(未回答・間違えた問題から)');
+  d.rounds.forEach(function (r) { add(r, r + '(全問を順番に)'); });
   if (keep && d.rounds.indexOf(keep) >= 0) sel.value = keep;
   document.getElementById('daimon1Info').textContent = '全' + d.total + '問(' + (d.grade || '2級') + 'の過去問)・解いた問題 ' + d.answered + '問' +
     (d.accuracy === null ? '' : '・正答率 ' + d.accuracy + '%');

@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css?v=2026-10-11d">
+<link rel="stylesheet" href="style.css?v=2026-10-11g">
 </head>
 <body>
 
@@ -55,6 +55,11 @@
           <button class="chip" data-value="reading">Readingのみ</button>
           <button class="chip" data-value="listening">Listeningのみ</button>
         </div>
+      </div>
+
+      <div class="card" id="studyPlanCard">
+        <h2>学習計画(今日の目安)</h2>
+        <div id="studyPlanBody" class="study-plan-body">読み込み中...</div>
       </div>
 
       <div class="card" id="vocabCard">
@@ -116,6 +121,17 @@
         </div>
 
         <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
+      </div>
+
+      <div class="card" id="listeningCard">
+        <h2>リスニング(過去問)</h2>
+        <p class="section-label">級と、解く回を選びます。🎧は本番の音声、🗣️は読み上げ音声で流れます</p>
+        <div id="listeningBox">
+          <select id="listeningGradeSelect" class="vocab-select" style="display:none;"></select>
+          <select id="listeningRoundSelect" class="vocab-select"></select>
+          <button id="listeningStartBtn" class="btn-primary practice-btn">リスニングを解く</button>
+          <p class="memorize-note" id="listeningInfo">読み込み中...</p>
+        </div>
       </div>
 
       <div class="card">
@@ -345,7 +361,7 @@
 
 </div>
 
-<script src="app.js?v=2026-10-11d"></script>
-  <script src="vocab.js?v=2026-10-11d"></script>
+<script src="app.js?v=2026-10-11g"></script>
+  <script src="vocab.js?v=2026-10-11g"></script>
 </body>
 </html>

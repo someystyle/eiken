@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-11d';
+const APP_VERSION = '2026-10-11g';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -105,6 +105,14 @@ window.addEventListener('DOMContentLoaded', function () {
   setupHomeTabs();
 
   document.getElementById('startBtn').addEventListener('click', startSession);
+  document.getElementById('listeningStartBtn').addEventListener('click', function () {
+    const v = document.getElementById('listeningRoundSelect').value.split('|');
+    startListeningSet_(document.getElementById('listeningGradeSelect').value, v[0] || '', v[1] || '');
+  });
+  document.getElementById('listeningGradeSelect').addEventListener('change', function () {
+    state.listeningGrade = this.value;
+    renderListeningMenu_();
+  });
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
     stopSpeech_(); // Listening再生中に中断した場合、音声を止め忘れないように
     state.isMockExam = false; // 模試を中断した場合、結果は記録せず状態だけリセットする
@@ -165,6 +173,7 @@ window.addEventListener('DOMContentLoaded', function () {
 
 function stopSpeech_() {
   if (typeof vocabCancelSpeakTimer_ === 'function') vocabCancelSpeakTimer_();
+  stopListeningAudio_();
   try {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
   } catch (e) { /* ignore */ }
@@ -305,6 +314,109 @@ function loadStats() {
   });
   loadPausePeriods();
   loadExamInfo();
+  loadStudyPlan_();
+  loadListeningMenu_();
+}
+
+// ---- リスニング(過去問)を解く: 級と回(部)を選んで、リスニングだけを解く ----
+function loadListeningMenu_() {
+  if (!document.getElementById('listeningBox')) return;
+  callApi('getListeningMenu', { token: state.token }).then(function (res) {
+    if (!res.ok) { document.getElementById('listeningInfo').textContent = '取得に失敗しました。'; return; }
+    state.listeningMenu = res;
+    renderListeningMenu_();
+  }).catch(function () { document.getElementById('listeningInfo').textContent = '通信に失敗しました。'; });
+}
+
+function renderListeningMenu_() {
+  const m = state.listeningMenu;
+  const info = document.getElementById('listeningInfo');
+  if (!m || !m.grades || m.grades.length === 0) { info.textContent = 'リスニングの問題がまだ登録されていません。'; return; }
+  const g = m.grades.find(function (x) { return x.grade === (state.listeningGrade || m.defaultGrade); }) || m.grades[0];
+  const gsel = document.getElementById('listeningGradeSelect');
+  gsel.innerHTML = '';
+  m.grades.forEach(function (x) { const o = document.createElement('option'); o.value = x.grade; o.textContent = x.grade + 'の過去問'; gsel.appendChild(o); });
+  gsel.value = g.grade;
+  gsel.style.display = m.grades.length > 1 ? '' : 'none';
+  const sel = document.getElementById('listeningRoundSelect');
+  const keep = sel.value;
+  sel.innerHTML = '';
+  const add = function (value, text) { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); };
+  add('', 'おまかせ5問(まだ解いていない問題から)');
+  g.rounds.forEach(function (r) {
+    r.parts.forEach(function (p) {
+      const mark = p.audio === p.n ? '🎧' : (p.audio > 0 ? '🎧一部' : '🗣️');
+      add(r.round + '|' + p.part, mark + ' ' + r.round + ' ' + p.part + '(No.' + p.from + '〜' + p.to + '・' + p.n + '問)');
+    });
+  });
+  if (keep && [].some.call(sel.options, function (o) { return o.value === keep; })) sel.value = keep;
+  info.textContent = '全' + g.total + '問(' + g.grade + ')・解いた問題 ' + g.answered + '問';
+}
+
+function startListeningSet_(grade, round, part) {
+  showScreen('screen-quiz');
+  document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題中...</p>';
+  callApi('getListeningSet', { token: state.token, grade: grade, round: round, part: part, count: 5 }).then(function (res) {
+    if (!res.ok || !res.questions || res.questions.length === 0) {
+      document.getElementById('quizCard').innerHTML = '<p class="quiz-word">出題できる問題がありません</p>';
+      return;
+    }
+    state.questions = res.questions;
+    state.currentIndex = 0;
+    state.correctCount = 0;
+    state.rehabMode = false;
+    renderQuestion();
+  }).catch(function () { document.getElementById('quizCard').innerHTML = '<p class="quiz-word">通信に失敗しました</p>'; });
+}
+
+// ---- 学習計画: 試験日から逆算した「今日の目安」 ----
+function loadStudyPlan_() {
+  const body = document.getElementById('studyPlanBody');
+  if (!body) return;
+  callApi('getStudyPlan', { token: state.token }).then(function (res) {
+    if (!res.ok) { body.textContent = '取得に失敗しました。'; return; }
+    body.innerHTML = renderStudyPlan_(res);
+    const goBtn = document.getElementById('studyPlanGoSetting');
+    if (goBtn) goBtn.addEventListener('click', function () { switchHomeTab('setting'); });
+  }).catch(function () { body.textContent = '通信に失敗しました。'; });
+}
+
+function renderStudyPlan_(res) {
+  if (!res.hasTarget) {
+    return '<p class="memorize-note">目標の試験日を登録すると、試験日から逆算して「今日はどれだけやればよいか」の目安を出します。</p>' +
+      '<button id="studyPlanGoSetting" class="btn-link">⚙️ Settingで試験日を登録する</button>';
+  }
+  let html = '<p class="quiz-instruction reading-instruction">試験日 ' + escapeHtml_(res.examDate) + ' まで あと<b>' + res.daysLeft + '日</b></p>';
+  html += res.finalReview
+    ? '<p class="memorize-note">試験まで4週間を切りました。新しい内容は残りの半分の日数で終え、その後は復習・間違えた問題の解き直しにあてましょう。</p>'
+    : '<p class="memorize-note">新しい内容(まだ見ていない単語・まだ解いていない過去問)を ' + escapeHtml_(res.finishDate) +
+      ' までに終える計画です。最後の2週間は総復習にあてます。目安は毎日「残りの量÷残りの日数」で計算し直すので、休んだ日があっても少しずつ取り戻せます。</p>';
+  html += '<div class="plan-list">';
+  res.items.forEach(function (it) {
+    if (it.key !== 'vocabReview' && !it.total) return; // その級の問題がまだ無い項目は出さない
+    let right;
+    if (it.reviewOnly) {
+      right = it.remaining > 0 ? '残り <b>' + it.remaining + '</b>' + it.unit : '<span class="plan-done">今日復習する語はありません</span>';
+    } else if (it.target === 0) {
+      right = '<span class="plan-done">✅ 全部終わりました</span>';
+    } else {
+      const done = Math.min(it.done, it.target);
+      const ok = it.done >= it.target;
+      right = it.period + ' <b>' + it.done + '</b> / ' + it.target + it.unit + (ok ? ' <span class="plan-done">✅</span>' : '');
+      right += '<div class="plan-bar"><div class="plan-bar-fill' + (ok ? ' ok' : '') + '" style="width:' + Math.round(done / it.target * 100) + '%"></div></div>';
+    }
+    let sub = '';
+    if (!it.reviewOnly && it.total) sub = '残り ' + it.remaining + ' / 全' + it.total + it.unit;
+    if (it.status === 'behind') sub += ' <span class="plan-behind">予定より' + it.diff + it.unit + '遅れ</span>';
+    else if (it.status === 'ahead') sub += ' <span class="plan-ahead">予定より' + it.diff + it.unit + '先行</span>';
+    html += '<div class="plan-row"><div class="plan-label">' + escapeHtml_(it.label) +
+      (sub ? '<div class="plan-sub">' + sub + '</div>' : '') + '</div><div class="plan-right">' + right + '</div></div>';
+  });
+  html += '</div>';
+  if (res.vocabOverMax) html += '<p class="memorize-note">単語の目安が多めです。T1900見出し語と熟語を優先し、余力があれば他の語に進みましょう。</p>';
+  if (res.lags && res.lags.length) html += '<p class="plan-lag">⚠ 予定より遅れている項目があります(赤字)。今日の目安は遅れの分も含めて計算し直しているので、目安どおりに進めれば少しずつ追いつけます。</p>';
+  else if (res.tracking) html += '<p class="memorize-note">計画を始めた日(' + escapeHtml_(res.planStart) + ')の予定どおりに進んでいます。</p>';
+  return html;
 }
 
 // ---- 5技能バランスのレーダーチャート(何が不得意か一目で分かる用途) ----
@@ -945,6 +1057,7 @@ function renderListeningCard(q) {
     '<p class="reading-label">' + escapeHtml_(partLabel) + '</p>' +
     '<p class="listening-speed-label">再生速度: ' + escapeHtml_(speedLevelLabel_(speedRate)) +
     '(正答率が上がると自動で速くなります)</p>' +
+    '<p class="listening-source-label" id="listeningSource">' + (q.audio ? '🎧 本番の音声' : '🗣️ 読み上げ音声(本番の音声が無い問題)') + '</p>' +
     '<button id="listeningPlayBtn" class="btn-primary listening-play-btn">🔊 音声を再生</button>' +
     '<p class="quiz-instruction reading-instruction">' + escapeHtml_(q.questionText || '内容に最も合うものを選んでください') + '</p>' +
     '<div id="quizChoices" class="choice-list"></div>' +
@@ -953,7 +1066,7 @@ function renderListeningCard(q) {
 
   document.getElementById('listeningPlayBtn').addEventListener('click', function () {
     state.listeningReplayCount++;
-    const ok = speakText_(ttsCleanScript_(q.script), speedRate);
+    const ok = playListening_(q, speedRate);
     const btn = document.getElementById('listeningPlayBtn');
     if (!ok) {
       btn.textContent = 'この端末では読み上げに対応していません';
@@ -972,7 +1085,87 @@ function renderListeningCard(q) {
   });
 
   // 出題中は自動で1回再生しておく(再生ボタンの押し忘れ対策。リピート回数にはカウントしない)
-  speakText_(ttsCleanScript_(q.script), speedRate);
+  playListening_(q, speedRate);
+}
+
+// ---- リスニングの再生: 本番の音声(Googleドライブの音声ファイルの、その問題の部分)を優先し、
+// 無い問題・再生できないときは端末の読み上げ(TTS)にする ----
+let listeningAudio_ = null;      // 再生に使う <audio>(音声ファイルごとに作り直す)
+let listeningAudioStop_ = null;  // 問題の終わりで止めるための監視
+
+function stopListeningAudio_() {
+  if (listeningAudioStop_ && listeningAudio_) listeningAudio_.removeEventListener('timeupdate', listeningAudioStop_);
+  listeningAudioStop_ = null;
+  if (listeningAudio_) { try { listeningAudio_.pause(); } catch (e) { /* ignore */ } }
+}
+
+// 読み上げ用の文: 原稿の後に、英語の質問文があれば続けて読む(本番も質問が読まれるため)
+function listeningTtsText_(q) {
+  const qText = String(q.questionText || '');
+  const english = /[A-Za-z]/.test(qText) && !/[ぁ-んァ-ヶ一-龠]/.test(qText);
+  return ttsCleanScript_(q.script) + (english ? ' Question. ' + qText : '');
+}
+
+function playListeningTts_(q, speedRate) {
+  const label = document.getElementById('listeningSource');
+  if (label && q.audio) label.textContent = '🗣️ 本番の音声を読み込めなかったので、読み上げ音声で再生しています';
+  return speakText_(listeningTtsText_(q), speedRate);
+}
+
+function playListening_(q, speedRate) {
+  stopListeningAudio_();
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  const a = q.audio;
+  if (!a || !a.url || q.audioFailed) return playListeningTts_(q, speedRate);
+
+  if (!listeningAudio_ || listeningAudio_.dataset.url !== a.url) {
+    stopListeningAudio_();
+    listeningAudio_ = new Audio();
+    listeningAudio_.preload = 'auto';
+    listeningAudio_.dataset.url = a.url;
+    listeningAudio_.src = a.url;
+  }
+  const audio = listeningAudio_;
+  let started = false;
+  const fail = function () {
+    if (started) return;
+    started = true;
+    q.audioFailed = true; // この問題は以後、読み上げで再生する
+    playListeningTts_(q, speedRate);
+  };
+  const begin = function () {
+    if (started) return;
+    try {
+      audio.currentTime = a.start;
+      audio.playbackRate = speedRate || 1.0;
+      if ('preservesPitch' in audio) audio.preservesPitch = true;
+    } catch (e) { fail(); return; }
+    let checked = false;
+    listeningAudioStop_ = function () {
+      // 途中から再生できない(頭から流れてしまう)ときは、読み上げにする
+      if (!checked && audio.currentTime > 0) {
+        checked = true;
+        if (Math.abs(audio.currentTime - a.start) > 3) { stopListeningAudio_(); started = false; fail(); return; }
+      }
+      if (audio.currentTime >= a.end) stopListeningAudio_();
+    };
+    audio.addEventListener('timeupdate', listeningAudioStop_);
+    const p = audio.play();
+    started = true;
+    if (p && p.catch) p.catch(function (err) {
+      // 自動再生がブラウザに止められた場合は、何もしない(再生ボタンを押せば本番の音声で流れる)
+      if (err && err.name === 'NotAllowedError') { stopListeningAudio_(); return; }
+      started = false; fail();
+    });
+  };
+  audio.addEventListener('error', fail, { once: true });
+  if (audio.readyState >= 1) begin();
+  else {
+    audio.addEventListener('loadedmetadata', begin, { once: true });
+    setTimeout(function () { if (!started) fail(); }, 15000); // 15秒たっても読み込めなければ読み上げにする
+    try { audio.load(); } catch (e) { /* ignore */ }
+  }
+  return true;
 }
 
 function onChooseListening(choice, btnEl) {
@@ -980,6 +1173,7 @@ function onChooseListening(choice, btnEl) {
   const elapsedSec = Math.round((Date.now() - state.questionStartTime) / 1000);
 
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  stopListeningAudio_();
   document.querySelectorAll('.choice-btn').forEach(function (b) { b.disabled = true; });
   btnEl.classList.add('pending', 'selected');
 

@@ -563,3 +563,30 @@ input[type="text"] {
 .through-result summary { cursor: pointer; font-weight: 600; }
 .through-q { font-weight: 600; margin: 8px 0 4px; }
 .through-choices { margin: 4px 0 8px; padding-left: 22px; line-height: 1.6; }
+
+/* Study の色分け: カードごとに色を変え、色でも探しやすくする(左の帯・見出し・ボタン) */
+.sec-plan { --accent: #455a64; --accent-soft: #eef1f3; }
+.sec-session { --accent: #2d6a4f; --accent-soft: #eaf4ee; }
+.sec-vocab { --accent: #1d5fa8; --accent-soft: #e9f1fb; }
+.sec-listening { --accent: #6a3fa0; --accent-soft: #f2ecf9; }
+.sec-writing { --accent: #b04a12; --accent-soft: #fbefe7; }
+.sec-pron { --accent: #0b7480; --accent-soft: #e6f4f5; }
+.sec-mock { --accent: #9c2f55; --accent-soft: #f8eaef; }
+.sec { border-left: 6px solid var(--accent); }
+.sec h2 { color: var(--accent); background: var(--accent-soft); margin: -20px -20px 14px -14px; padding: 12px 14px; border-radius: 0 16px 0 0; }
+.sec .btn-primary { background: var(--accent); }
+.sec .btn-primary:active:not(:disabled) { filter: brightness(0.85); }
+.sec .btn-primary:disabled { background: #a9b5ae; }
+.sec .btn-link { color: var(--accent); }
+.sec .chip.selected { background: var(--accent); border-color: var(--accent); }
+
+/* はじめに */
+.intro-steps { margin: 4px 0 0; padding-left: 22px; line-height: 1.75; font-size: 14px; }
+.intro-steps li { margin-bottom: 10px; }
+.intro-steps b { color: var(--text); }
+.intro-legend { display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 14px; }
+.intro-legend span { display: block; border-left: 6px solid var(--accent); background: var(--accent-soft); padding: 6px 10px; border-radius: 6px; }
+.intro-text { font-size: 14px; line-height: 1.75; margin: 0 0 8px; }
+.intro-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin: 6px 0 4px; }
+.intro-flow span { background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+.home-tab { white-space: nowrap; font-size: 13px; padding: 10px 2px; min-width: 0; }

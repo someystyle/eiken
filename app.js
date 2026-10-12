@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-12c';
+const APP_VERSION = '2026-10-12e';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -223,7 +223,8 @@ function setupHomeTabs() {
     btn.addEventListener('click', function () { switchHomeTab(btn.dataset.tab); });
   });
   const saved = safeGetLocalStorage(LS_HOME_TAB_KEY);
-  if (saved) switchHomeTab(saved);
+  // 初めて開いた人(どのタブも開いたことがない)には「はじめに」を見せる
+  switchHomeTab(saved || 'intro');
 }
 
 function updateStartBtn() {
@@ -586,7 +587,7 @@ function renderStudyPlan_(res) {
       (sub ? '<div class="plan-sub">' + sub + '</div>' : '') + '</div><div class="plan-right">' + right + '</div></div>';
   });
   html += '</div>';
-  if (res.vocabOverMax) html += '<p class="memorize-note">単語の目安が多めです。T1900見出し語と熟語を優先し、余力があれば他の語に進みましょう。</p>';
+  if (res.vocabOverMax) html += '<p class="memorize-note">単語の目安が多めです。T1900見出し語を優先し、余力があれば他の語に進みましょう。</p>';
   if (res.lags && res.lags.length) html += '<p class="plan-lag">⚠ 予定より遅れている項目があります(赤字)。今日の目安は遅れの分も含めて計算し直しているので、目安どおりに進めれば少しずつ追いつけます。</p>';
   else if (res.tracking) html += '<p class="memorize-note">計画を始めた日(' + escapeHtml_(res.planStart) + ')の予定どおりに進んでいます。</p>';
   return html;

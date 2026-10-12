@@ -24,8 +24,8 @@ const vstate = {
 const VOCAB_SCOPES = [
   { key: 't1900', label: 'T1900', visible: function () { return true; } },
   { key: 'derived', label: 'T1900派生語', visible: function (s) { return s.derived; } },
-  { key: 'idiom', label: '熟語', visible: function (s) { return s.idiom; } },
-  { key: 'kakomon', label: '過去問', visible: function (s) { return s.kakomon; } },
+  { key: 'kakomon', label: '過去問の単語', visible: function (s) { return s.kakomon; } },
+  { key: 'idiom', label: '過去問の熟語', visible: function (s) { return s.idiom; } },
   { key: 'ss', label: 'SS', visible: function (s) { return s.v8; } },
   { key: 'v8', label: 'S・A・B', visible: function (s) { return s.v8; } },
   { key: 'v8opt', label: 'B3・D', visible: function (s) { return s.v8 && s.v8opt; } },
@@ -45,8 +45,8 @@ const VOCAB_TEST_FORMS = [
 
 const VOCAB_SETTING_TOGGLES = [
   { key: 'derived', label: 'T1900派生語を含む' },
-  { key: 'idiom', label: '熟語を含む(過去問に出た熟語から。T1900と並行して進みます)' },
-  { key: 'kakomon', label: '過去問の語を含む' },
+  { key: 'kakomon', label: '過去問の単語を含む' },
+  { key: 'idiom', label: '過去問の熟語を含む' },
   { key: 'jun1', label: 'T1900英検準1級を含む' },
   { key: 'teap', label: 'T1900TEAPを含む' },
   { key: 'v8', label: '外部ソースSS・S・A・Bランク(v8語彙)を含む' },
@@ -173,8 +173,8 @@ function vocabGroupTotal_(key) {
   return (t === null || t === undefined) ? null : Number(t);
 }
 
-// 表示するグループか(Settingでオンで、該当する語が1語以上あるもの。例: 「過去問の語」をオンにすると、SSの語は
-// すべて過去問の語に含まれるため、SS専用のグループは0語になり出さない)
+// 表示するグループか(Settingでオンで、該当する語が1語以上あるもの。例: 「過去問の単語」をオンにすると、SSの語は
+// すべて過去問の単語・熟語に含まれるため、SS専用のグループは0語になり出さない)
 function vocabGroupVisible_(g, s) {
   if (!g.visible(s)) return false;
   const t = vocabGroupTotal_(g.key);

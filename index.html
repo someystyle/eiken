@@ -6,7 +6,7 @@
 <title>チリツモEikenPass</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css?v=2026-10-12c">
+<link rel="stylesheet" href="style.css?v=2026-10-12e">
 </head>
 <body>
 
@@ -39,9 +39,62 @@
     </header>
 
     <div class="home-tab-bar" id="homeTabBar">
+      <button class="home-tab" data-tab="intro">🔰 はじめに</button>
       <button class="home-tab selected" data-tab="study">📖 Study</button>
       <button class="home-tab" data-tab="data">📊 Data</button>
       <button class="home-tab" data-tab="setting">⚙️ Setting</button>
+    </div>
+
+    <div class="home-tab-panel" data-tab-panel="intro">
+      <div class="card">
+        <h2>🔰 はじめての人へ</h2>
+        <p class="intro-text">英検の合格を目指して、毎日少しずつ進めるアプリです。問題はすべて実際の過去問から作っています。</p>
+      </div>
+
+      <div class="card">
+        <h2>はじめる前に(1回だけ)</h2>
+        <ol class="intro-steps">
+          <li><b>⚙️ Setting タブで「目標試験日」を登録</b>します。試験日から逆算して、毎日の目安(学習計画)が出るようになります。</li>
+          <li>単語の設定は、はじめは<b>そのままで大丈夫</b>です。T1900から順に進み、覚えてきたら過去問の単語・熟語へと自動で広がります。</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>毎日の進め方(Study タブを上から順に)</h2>
+        <ol class="intro-steps">
+          <li><b>📅 学習計画</b>で、今日の目安を見ます。</li>
+          <li><b>▶️ 今日のセッション</b>を始めます。時間と体調を選ぶだけで、単語の復習と新しい単語が出ます。30分以上なら長文とリスニングもまざります。<b>毎日これだけでもOK</b>です。</li>
+          <li>時間があれば、目安が残っているものを練習します。<b>📘 単語</b>(範囲を決めて覚える・テスト、大問1)、<b>🎧 リスニング</b>、<b>✍️ Writing</b>。</li>
+          <li><b>🔊 発音を聞く</b>は、すきま時間の耳慣らしに使います。</li>
+          <li>月に1回、<b>🏁 月次模試</b>で実力を確かめます。</li>
+          <li><b>📊 Data タブ</b>で、進み具合とスコアを確かめます。</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>合格までの考え方</h2>
+        <div class="intro-flow"><span>単語</span>→<span>大問1・長文</span>→<span>リスニング</span>→<span>Writing</span>→<span>総復習</span></div>
+        <ol class="intro-steps">
+          <li><b>単語がすべての土台</b>です。覚えた単語はテストに正解すると、1日後・3日後・1週間後…と間隔をあけて自動で復習に出ます。別々の日に2回正解すると「習得」です。</li>
+          <li>覚えた単語を、<b>大問1と長文</b>(本番と同じ形式の過去問)で使えるようにします。</li>
+          <li><b>リスニング</b>は本番の音声で耳を慣らし、慣れたら「本番形式で通して解く」で本番と同じ流れを練習します。</li>
+          <li><b>Writing</b>は「型」に沿って書き、AIコーチの採点と模範解答を見て書き直します。</li>
+          <li>試験の<b>2週間前からは総復習</b>(復習の単語・間違えた問題)を中心にします。</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>色の見方(Study タブ)</h2>
+        <div class="intro-legend">
+          <span class="sec-plan">📅 学習計画 … 今日やること</span>
+          <span class="sec-session">▶️ 今日のセッション … 毎日の中心</span>
+          <span class="sec-vocab">📘 単語 … 覚える・テスト・大問1</span>
+          <span class="sec-listening">🎧 リスニング … 過去問・本番形式</span>
+          <span class="sec-writing">✍️ Writing / Speaking … 書く・話す</span>
+          <span class="sec-pron">🔊 発音を聞く … 耳慣らし</span>
+          <span class="sec-mock">🏁 月次模試 … 月1回の実力チェック</span>
+        </div>
+      </div>
     </div>
 
     <div class="home-tab-panel active" data-tab-panel="study">
@@ -57,13 +110,36 @@
         </div>
       </div>
 
-      <div class="card" id="studyPlanCard">
-        <h2>学習計画(今日の目安)</h2>
+      <div class="card sec sec-plan" id="studyPlanCard">
+        <h2>📅 学習計画(今日の目安)</h2>
         <div id="studyPlanBody" class="study-plan-body">読み込み中...</div>
       </div>
 
-      <div class="card" id="vocabCard">
-        <h2>単語</h2>
+      <div class="card sec sec-session">
+        <h2>▶️ 今日のセッション</h2>
+        <p id="dueTodayLine" class="due-today" style="display:none;"></p>
+        <p class="section-label">今使える時間</p>
+        <div class="chip-group" id="minutesChips">
+          <button class="chip" data-value="5">5分</button>
+          <button class="chip" data-value="10">10分</button>
+          <button class="chip" data-value="15">15分</button>
+          <button class="chip" data-value="30">30分</button>
+          <button class="chip" data-value="50">50分</button>
+          <button class="chip" data-value="60">60分+</button>
+        </div>
+
+        <p class="section-label">今のコンディション</p>
+        <div class="chip-group" id="conditionChips">
+          <button class="chip" data-value="元気">元気</button>
+          <button class="chip" data-value="普通">普通</button>
+          <button class="chip" data-value="疲れた">疲れた</button>
+        </div>
+
+        <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
+      </div>
+
+      <div class="card sec sec-vocab" id="vocabCard">
+        <h2>📘 単語</h2>
         <div id="vocabNotice" class="vocab-notice" style="display:none;">
           <span id="vocabNoticeText">T1900を確認しましょう</span>
           <button id="vocabNoticeTestBtn" class="btn-link">おまかせテストをする</button>
@@ -100,31 +176,8 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>今日のセッション</h2>
-        <p id="dueTodayLine" class="due-today" style="display:none;"></p>
-        <p class="section-label">今使える時間</p>
-        <div class="chip-group" id="minutesChips">
-          <button class="chip" data-value="5">5分</button>
-          <button class="chip" data-value="10">10分</button>
-          <button class="chip" data-value="15">15分</button>
-          <button class="chip" data-value="30">30分</button>
-          <button class="chip" data-value="50">50分</button>
-          <button class="chip" data-value="60">60分+</button>
-        </div>
-
-        <p class="section-label">今のコンディション</p>
-        <div class="chip-group" id="conditionChips">
-          <button class="chip" data-value="元気">元気</button>
-          <button class="chip" data-value="普通">普通</button>
-          <button class="chip" data-value="疲れた">疲れた</button>
-        </div>
-
-        <button id="startBtn" class="btn-primary" disabled>学習をはじめる</button>
-      </div>
-
-      <div class="card" id="listeningCard">
-        <h2>リスニング(過去問)</h2>
+      <div class="card sec sec-listening" id="listeningCard">
+        <h2>🎧 リスニング(過去問)</h2>
         <p class="section-label">級と、解く回を選びます。🎧は本番の音声、🗣️は読み上げ音声で流れます</p>
         <div id="listeningBox">
           <select id="listeningGradeSelect" class="vocab-select" style="display:none;"></select>
@@ -136,8 +189,15 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>発音を聞く</h2>
+      <div class="card sec sec-writing">
+        <h2>✍️ Writing / Speaking 練習</h2>
+        <p class="section-label">NotebookLM(AIコーチ)に貼り付けてフィードバックをもらいます</p>
+        <button id="writingPracticeBtn" class="btn-primary practice-btn">✏️ Writingを1問やる</button>
+        <button id="speakingPracticeBtn" class="btn-primary practice-btn">🗣️ Speakingを1問やる</button>
+      </div>
+
+      <div class="card sec sec-pron">
+        <h2>🔊 発音を聞く</h2>
         <p class="section-label">正誤判定はありません。単語の発音を繰り返し聞いて耳と口を慣らします</p>
         <p class="section-label">聞くグループ(Settingでオンにしたグループが出ます)</p>
         <div class="chip-group" id="pronGroupChips"></div>
@@ -148,15 +208,8 @@
         <button id="pronunciationBtn" class="btn-primary practice-btn">🔊 このグループを10語ずつ聞く</button>
       </div>
 
-      <div class="card">
-        <h2>Writing / Speaking 練習</h2>
-        <p class="section-label">NotebookLM(AIコーチ)に貼り付けてフィードバックをもらいます</p>
-        <button id="writingPracticeBtn" class="btn-primary practice-btn">✏️ Writingを1問やる</button>
-        <button id="speakingPracticeBtn" class="btn-primary practice-btn">🗣️ Speakingを1問やる</button>
-      </div>
-
-      <div class="card">
-        <h2>月次模試</h2>
+      <div class="card sec sec-mock">
+        <h2>🏁 月次模試</h2>
         <p class="section-label">本番同様の構成(Vocabulary17問・Reading14問・Listening30問、計61問)です。まとまった時間が必要です</p>
         <button id="startMockExamBtn" class="btn-primary practice-btn">📝 月次模試を受ける</button>
       </div>
@@ -172,7 +225,7 @@
         <p id="statsIntro" class="section-label">これまでに勉強した単語全体の数字です。最初はT1900だけで、グループが解放されて学習した分も加わります。グループごとの進み具合は、下の「単語の進捗」で見ます。</p>
         <div id="statsBody" class="stats-grid">読み込み中...</div>
         <ul id="statsNote" class="stats-note">
-          <li><b>累計学習語数</b> … カードの「覚えた/まだ」やテストで、一度でも出会った語の数。T1900の見出し語・派生語・過去問の語など、グループの区別なく全部の合計です。</li>
+          <li><b>累計学習語数</b> … カードの「覚えた/まだ」やテストで、一度でも出会った語の数。T1900の見出し語・派生語・過去問の単語や熟語など、グループの区別なく全部の合計です。</li>
           <li><b>克服した語</b> … いま習得している語の数(別々の日に2回続けて正解し、最後の正解から30日以内)。全グループの合計で、30日たつと減ることがあります。</li>
           <li><b>弱点語</b> … 最近間違えて「要復習」になっている語、または誤答が多い語の数(全グループの合計)。</li>
           <li><b>通算正答率</b> … 単語のテスト(今日のセッション・単語テスト・T1900テスト)の、これまでの全回答の正答率です。</li>
@@ -363,7 +416,7 @@
 
 </div>
 
-<script src="app.js?v=2026-10-12c"></script>
-  <script src="vocab.js?v=2026-10-12c"></script>
+<script src="app.js?v=2026-10-12e"></script>
+  <script src="vocab.js?v=2026-10-12e"></script>
 </body>
 </html>

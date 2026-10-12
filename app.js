@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-12b';
+const APP_VERSION = '2026-10-12c';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -112,6 +112,11 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('listeningGradeSelect').addEventListener('change', function () {
     state.listeningGrade = this.value;
     renderListeningMenu_();
+  });
+  document.getElementById('listeningRoundSelect').addEventListener('change', updateListeningThroughBtn_);
+  document.getElementById('listeningThroughBtn').addEventListener('click', function () {
+    const v = document.getElementById('listeningRoundSelect').value.split('|');
+    if (v.length === 2) startListeningThrough_(document.getElementById('listeningGradeSelect').value, v[0], v[1]);
   });
   document.getElementById('quitQuizBtn').addEventListener('click', function () {
     stopSpeech_(); // Listening再生中に中断した場合、音声を止め忘れないように
@@ -351,6 +356,174 @@ function renderListeningMenu_() {
   });
   if (keep && [].some.call(sel.options, function (o) { return o.value === keep; })) sel.value = keep;
   info.textContent = '全' + g.total + '問(' + g.grade + ')・解いた問題 ' + g.answered + '問';
+  state.listeningPartAudio = {};
+  g.rounds.forEach(function (r) { r.parts.forEach(function (p) { state.listeningPartAudio[r.round + '|' + p.part] = p.n > 0 && p.audio === p.n; }); });
+  updateListeningThroughBtn_();
+}
+
+// 本番形式の通し聞きは、回と部を選び、その部の全問に本番の音声があるときだけ使える
+function updateListeningThroughBtn_() {
+  const v = document.getElementById('listeningRoundSelect').value;
+  const ok = !!v && !!(state.listeningPartAudio && state.listeningPartAudio[v]);
+  document.getElementById('listeningThroughBtn').disabled = !ok;
+  document.getElementById('listeningThroughNote').textContent = !v
+    ? '回と部を選ぶと使えます。日本語の説明から最後まで、本番と同じ流れで続けて流れます(速さは本番どおり)。'
+    : (ok ? '日本語の説明から最後まで、本番と同じ流れで続けて流れます(速さは本番どおり)。各問題の解答時間に答えを選んでください。'
+      : 'この部は本番の音声が使えないため、通し聞きはできません。');
+}
+
+// ---- 本番形式の通し聞き: 部の音声ファイルを最初から最後まで流し、問題を順に切り替える ----
+// 各問題の範囲(音声開始秒〜音声終了秒)と、その後の10秒の解答時間に答えを選ぶ。答えは最後にまとめて記録する。
+function startListeningThrough_(grade, round, part) {
+  showScreen('screen-quiz');
+  const card = document.getElementById('quizCard');
+  card.innerHTML = '<p class="quiz-word">準備中...</p>';
+  document.getElementById('quizProgress').textContent = '';
+  callApi('getListeningSet', { token: state.token, grade: grade, round: round, part: part, ordered: '1' }).then(function (res) {
+    const qs = (res && res.ok && res.questions) || [];
+    if (qs.length === 0 || qs.some(function (q) { return !q.audio; })) {
+      card.innerHTML = '<p class="quiz-word">この部は本番の音声が使えません</p>';
+      return;
+    }
+    const t = state.through = {
+      grade: grade, round: round, part: part, questions: qs, answers: {}, current: -1,
+      url: qs[0].audio.url, objUrl: null, started: false, finished: false
+    };
+    renderThroughFrame_();
+    loadListeningBlob_(t.url).then(function (objUrl) {
+      if (state.through !== t) return;
+      t.objUrl = objUrl;
+      const btn = document.getElementById('throughPlayBtn');
+      if (btn) { btn.disabled = false; btn.textContent = '▶ 再生を始める'; }
+      document.getElementById('throughStatus').textContent = '準備ができました。「再生を始める」を押してください。';
+    }).catch(function () {
+      if (state.through !== t) return;
+      document.getElementById('throughStatus').textContent = '音声を読み込めませんでした。通信状態を確かめて、もう一度お試しください。';
+    });
+  }).catch(function () { card.innerHTML = '<p class="quiz-word">通信に失敗しました</p>'; });
+}
+
+function renderThroughFrame_() {
+  const t = state.through;
+  const card = document.getElementById('quizCard');
+  card.innerHTML =
+    '<p class="reading-label">Listening ' + escapeHtml_(t.part) + ' 本番形式(通し)</p>' +
+    '<p class="listening-speed-label">' + escapeHtml_(t.grade + ' ' + t.round) + '・全' + t.questions.length + '問・速さは本番どおり</p>' +
+    '<button id="throughPlayBtn" class="btn-primary listening-play-btn" disabled>音声を読み込み中…</button>' +
+    '<p id="throughStatus" class="quiz-instruction reading-instruction">音声を読み込んでいます(はじめの1回だけ、少し時間がかかります)</p>' +
+    '<div id="throughQuestion"></div>';
+  document.getElementById('throughPlayBtn').addEventListener('click', onThroughPlayBtn_);
+}
+
+function onThroughPlayBtn_() {
+  const t = state.through;
+  if (!t || !t.objUrl) return;
+  const audio = listeningAudioEl_();
+  const btn = document.getElementById('throughPlayBtn');
+  if (!t.started) {
+    t.started = true;
+    stopListeningAudio_();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    audio.dataset.url = t.objUrl;
+    audio.muted = false;
+    audio.src = t.objUrl;
+    audio.playbackRate = 1.0;
+    const token = listeningAudioToken_;
+    listeningAudioStop_ = function () { if (token === listeningAudioToken_) onThroughTime_(audio.currentTime); };
+    audio.addEventListener('timeupdate', listeningAudioStop_);
+    audio.addEventListener('ended', function () { if (token === listeningAudioToken_) finishThrough_(); }, { once: true });
+    const p = audio.play();
+    if (p && p.catch) p.catch(function () {
+      t.started = false;
+      document.getElementById('throughStatus').textContent = '再生できませんでした。もう一度「再生を始める」を押してください。';
+    });
+    btn.textContent = '⏸ 一時停止';
+    document.getElementById('throughStatus').textContent = '日本語の説明が流れています。そのまま聞いてください。';
+    return;
+  }
+  if (audio.paused) { audio.play(); btn.textContent = '⏸ 一時停止'; }
+  else { audio.pause(); btn.textContent = '▶ 続きから再生'; }
+}
+
+// 再生位置から、今どの問題か(放送中か解答時間か)を決めて、画面を切り替える
+function onThroughTime_(sec) {
+  const t = state.through;
+  if (!t || t.finished) return;
+  const qs = t.questions;
+  let k = -1;
+  for (let i = 0; i < qs.length; i++) { if (sec >= qs[i].audio.start) k = i; }
+  if (k !== t.current) { t.current = k; if (k >= 0) renderThroughQuestion_(k); }
+  if (k >= 0) {
+    const q = qs[k];
+    const answering = sec >= q.audio.end;
+    document.getElementById('throughStatus').textContent = 'No.' + q.number + (answering ? ' 解答時間です。答えを選んでください' : ' を放送中');
+    // 最後の問題の解答時間(10秒)が終わったら結果へ(その後は終了のアナウンスだけ)
+    if (k === qs.length - 1 && sec >= q.audio.end + 10.5) finishThrough_();
+  }
+}
+
+function renderThroughQuestion_(k) {
+  const t = state.through;
+  const q = t.questions[k];
+  document.getElementById('quizProgress').textContent = (k + 1) + ' / ' + t.questions.length;
+  // 本番の冊子と同じく、質問文は見せず選択肢だけを出す(準2級の第1部は選択肢も放送のみなので番号だけ)
+  const numbersOnly = q.grade === '準2級' && q.sectionType === '第1部';
+  const box = document.getElementById('throughQuestion');
+  box.innerHTML = '<p class="through-no">No.' + q.number + '</p><div class="choice-list" id="throughChoices"></div>';
+  const list = document.getElementById('throughChoices');
+  q.choices.forEach(function (c, i) {
+    const b = document.createElement('button');
+    b.className = 'choice-btn' + (t.answers[k] === c ? ' selected' : '');
+    b.textContent = (i + 1) + (numbersOnly ? '' : '  ' + c);
+    b.addEventListener('click', function () {
+      if (t.current !== k || t.finished) return;
+      t.answers[k] = c;
+      list.querySelectorAll('.choice-btn').forEach(function (x) { x.classList.remove('selected'); });
+      b.classList.add('selected');
+    });
+    list.appendChild(b);
+  });
+}
+
+// 終わったら、全問の答えを記録して結果を出す(答えなかった問題は不正解として記録)
+function finishThrough_() {
+  const t = state.through;
+  if (!t || t.finished) return;
+  t.finished = true;
+  stopListeningAudio_();
+  const card = document.getElementById('quizCard');
+  card.innerHTML = '<p class="quiz-word">答え合わせ中...</p>';
+  const answers = {};
+  t.questions.forEach(function (q, k) { answers[q.questionId] = t.answers[k] || ''; });
+  callApi('submitListeningBatch', { token: state.token, answers: JSON.stringify(answers) }).then(function (res) {
+    const byId = (res && res.ok && res.results) || {};
+    let correct = 0;
+    let html = '';
+    t.questions.forEach(function (q, k) {
+      const r = byId[q.questionId] ? Object.assign({ ok: true }, byId[q.questionId]) : null;
+      const ok = !!(r && r.correct);
+      if (ok) correct++;
+      const mine = t.answers[k];
+      const mineNo = mine ? (q.choices.indexOf(mine) + 1) : 0;
+      const ansNo = r && r.ok ? (q.choices.indexOf(r.answer) + 1) : 0;
+      html += '<details class="through-result ' + (ok ? 'ok' : 'ng') + '"><summary>' + (ok ? '○' : '×') + ' No.' + q.number +
+        ' あなた: ' + (mineNo ? mineNo : '未回答') + ' / 正解: ' + (ansNo || '?') + '</summary>' +
+        (q.questionText && /[A-Za-z]/.test(q.questionText) ? '<p class="through-q">' + escapeHtml_(q.questionText) + '</p>' : '') +
+        '<ol class="through-choices">' + q.choices.map(function (c) { return '<li>' + escapeHtml_(c) + '</li>'; }).join('') + '</ol>' +
+        '<div class="reading-passage listening-script">' + escapeHtml_(q.script).replace(/\n/g, '<br>') + '</div></details>';
+    });
+    card.innerHTML = '<p class="reading-label">Listening ' + escapeHtml_(t.part) + ' 本番形式(通し)の結果</p>' +
+      '<p class="quiz-word" style="font-size:24px;">' + correct + ' / ' + t.questions.length + ' 問正解</p>' +
+      '<p class="memorize-note">各問題を押すと、質問・選択肢・原稿が見られます。</p>' + html +
+      '<button id="throughHomeBtn" class="btn-primary">ホームに戻る</button>';
+    document.getElementById('throughHomeBtn').addEventListener('click', function () {
+      state.through = null;
+      showScreen('screen-home');
+      loadStats();
+    });
+  }).catch(function () {
+    card.innerHTML = '<p class="quiz-word">答えを記録できませんでした(通信エラー)</p>';
+  });
 }
 
 function startListeningSet_(grade, round, part) {
@@ -1064,14 +1237,16 @@ function renderListeningCard(q) {
     '<p id="quizFeedback" class="feedback-text"></p>' +
     '<div id="listeningScript" class="reading-passage listening-script" style="display:none;"></div>';
 
+  let plays = 0; // 1回目は「聞いた」、2回目以降を聞き直し(リピート回数)として記録する
   document.getElementById('listeningPlayBtn').addEventListener('click', function () {
-    state.listeningReplayCount++;
+    plays++;
+    state.listeningReplayCount = plays - 1;
     const ok = playListening_(q, speedRate);
     const btn = document.getElementById('listeningPlayBtn');
     if (!ok) {
       btn.textContent = 'この端末では読み上げに対応していません';
     } else {
-      btn.textContent = '🔁 もう一度聞く(' + state.listeningReplayCount + '回目)';
+      btn.textContent = '🔁 もう一度聞く' + (plays > 1 ? '(聞き直し' + (plays - 1) + '回目)' : '');
     }
   });
 
@@ -1084,8 +1259,7 @@ function renderListeningCard(q) {
     choicesEl.appendChild(btn);
   });
 
-  // 出題中は自動で1回再生しておく(再生ボタンの押し忘れ対策。リピート回数にはカウントしない)
-  playListening_(q, speedRate);
+  // 自動では流さない(「音声を再生」を押したときだけ流す)
 }
 
 // ---- リスニングの再生: 本番の音声(Googleドライブの音声ファイルの、その問題の部分)を優先し、

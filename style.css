@@ -553,3 +553,4 @@ input[type="text"] {
 
 /* 過去問 大問1: 選択欄が長い文字でスマホの枠からはみ出さないように、幅を枠に合わせる */
 #daimon1Box .vocab-select, #listeningBox .vocab-select { display: block; width: 100%; max-width: 100%; box-sizing: border-box; margin-bottom: 8px; text-overflow: ellipsis; }
+.listening-audio-why { display: block; font-size: 11px; color: #c0392b; margin-top: 2px; word-break: break-all; }

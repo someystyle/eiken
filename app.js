@@ -52,7 +52,7 @@ function callApi(action, params) {
 
 // ---- 初期化 ----
 // 画面に表示する版。index.html の ?v= と同じ値にして、どのファイルが読み込まれているか確認できるようにする。
-const APP_VERSION = '2026-10-11g';
+const APP_VERSION = '2026-10-12a';
 
 window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-version').forEach(function (el) { el.textContent = '版: ' + APP_VERSION; });
@@ -1108,8 +1108,38 @@ function listeningTtsText_(q) {
 
 function playListeningTts_(q, speedRate) {
   const label = document.getElementById('listeningSource');
-  if (label && q.audio) label.textContent = '🗣️ 本番の音声を読み込めなかったので、読み上げ音声で再生しています';
+  if (label && q.audio) {
+    label.textContent = '🗣️ 本番の音声を読み込めなかったので、読み上げ音声で再生しています';
+    showListeningAudioDiagnosis_(q, label);
+  }
   return speakText_(listeningTtsText_(q), speedRate);
+}
+
+// 本番の音声を読み込めなかった理由を、メッセージの下に小さく出す(設定の確認用。1問につき1回だけ調べる)
+function showListeningAudioDiagnosis_(q, label) {
+  if (q.audioDiagnosed) return;
+  q.audioDiagnosed = true;
+  const url = q.audio.url;
+  const note = document.createElement('span');
+  note.className = 'listening-audio-why';
+  label.appendChild(note);
+  if (url.indexOf('googleapis.com') < 0) {
+    note.textContent = '(理由: アプリのサーバー(Code.gs)が古い版のままです。新しいCode.gsを貼り付けて、新しいバージョンでデプロイしてください)';
+    return;
+  }
+  fetch(url, { headers: { Range: 'bytes=0-1' } }).then(function (res) {
+    if (res.ok) {
+      note.textContent = '(確認: 音声ファイル自体は読めました(' + res.status + ')。端末の音声再生側の問題の可能性があります)';
+      return null;
+    }
+    return res.text().then(function (t) {
+      let msg = '';
+      try { msg = JSON.parse(t).error.message; } catch (e) { msg = t.slice(0, 120); }
+      note.textContent = '(理由: ' + res.status + ' ' + msg + ')';
+    });
+  }).catch(function (e) {
+    note.textContent = '(理由: 通信できませんでした ' + (e && e.message ? e.message : '') + ')';
+  });
 }
 
 function playListening_(q, speedRate) {
